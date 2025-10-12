@@ -26,14 +26,14 @@ CREATE_GAME_SCHEMA = {
     "fields": [
         {"type": validate_word_id, "name": "game_id"},
         {"type": validate_username, "name": "player_one_username"},
-    ]
+    ],
 }
 JOIN_GAME_SCHEMA = {
     "type": dict,
     "fields": [
         {"type": validate_word_id, "name": "game_id"},
         {"type": validate_username, "name": "player_two_username"},
-    ]
+    ],
 }
 MAKE_MOVE_SCHEMA = {
     "type": dict,
@@ -41,14 +41,14 @@ MAKE_MOVE_SCHEMA = {
         {"type": validate_word_id, "name": "game_id"},
         {"type": validate_letter_id, "name": "password"},
         {"type": validate_move, "name": "move"},
-    ]
+    ],
 }
 FETCH_GAME_SCHEMA = {
     "type": dict,
     "fields": [
         {"type": validate_word_id, "name": "game_id"},
         {"type": validate_letter_id, "name": "password"},
-    ]
+    ],
 }
 
 
@@ -65,8 +65,8 @@ def create_game_route(event):
         return format_response(
             event=event,
             http_code=400,
-            body='We have detected inappropriate language in your username. If this is an error, '
-                 'please create a support ticket in the "Help" menu and we will whitelist the name.',
+            body="We have detected inappropriate language in your username. If this is an error, "
+            'please create a support ticket in the "Help" menu and we will whitelist the name.',
         )
     # if its an acceptable username, create a new game and send back the invite link
     player_one_password = letter_ids.generate_id()
@@ -89,7 +89,7 @@ def create_game_route(event):
             }
         ),
     )
-    if 'ConsumedCapacity' not in write_response:
+    if "ConsumedCapacity" not in write_response:
         return format_response(
             event=event,
             http_code=507,
@@ -107,6 +107,7 @@ def create_game_route(event):
         },
     )
 
+
 def join_game_route(event):
     body = validate_schema(parse_body(event["body"]), JOIN_GAME_SCHEMA)
     player_two_username = body["player_two_username"]
@@ -114,8 +115,8 @@ def join_game_route(event):
         return format_response(
             event=event,
             http_code=400,
-            body='We have detected inappropriate language in your username. If this is an error, '
-                 'please create a support ticket in the "Help" menu and we will whitelist the name.',
+            body="We have detected inappropriate language in your username. If this is an error, "
+            'please create a support ticket in the "Help" menu and we will whitelist the name.',
         )
     # check if the game exists
     game_id = body["game_id"]
@@ -139,7 +140,7 @@ def join_game_route(event):
         TableName=TABLE_NAME,
         Item=python_obj_to_dynamo_obj(game_owner_data),
     )
-    if 'ConsumedCapacity' not in write_response:
+    if "ConsumedCapacity" not in write_response:
         return format_response(
             event=event,
             http_code=507,
@@ -158,7 +159,7 @@ def join_game_route(event):
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # print(sorted(list(set(words))))
     for _ in range(0, 100):
         id_var = words_ids.generate_id()

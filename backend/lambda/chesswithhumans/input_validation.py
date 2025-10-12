@@ -74,7 +74,7 @@ def validate_schema(value, schema):
                 if not result:
                     return None
                 output.append(result)
-            return output;
+            return output
         if schema["type"] == dict:
             output = {}
             for field in schema["fields"]:
@@ -100,17 +100,27 @@ LOCATION_SHARING_SCHEMA = {
         {"type": validate_word_id, "name": "id"},
         {"type": validate_decimal, "name": "lat"},
         {"type": validate_decimal, "name": "lon"},
-    ]
+    ],
 }
 
-if __name__ == '__main__':
-    print(is_valid_against_schema({
-        "lat": "40.5123",
-        "lon": "-71.4123",
-        "id": "absent-topic-into",
-    }, LOCATION_SHARING_SCHEMA))
-    print(is_valid_against_schema({
-        "lat": "40W",
-        "lon": "-71S",
-        "id": "tuna-orient-midnight",
-    }, LOCATION_SHARING_SCHEMA))
+if __name__ == "__main__":
+    print(
+        is_valid_against_schema(
+            {
+                "lat": "40.5123",
+                "lon": "-71.4123",
+                "id": "absent-topic-into",
+            },
+            LOCATION_SHARING_SCHEMA,
+        )
+    )
+    print(
+        is_valid_against_schema(
+            {
+                "lat": "40W",
+                "lon": "-71S",
+                "id": "tuna-orient-midnight",
+            },
+            LOCATION_SHARING_SCHEMA,
+        )
+    )

@@ -1,5 +1,6 @@
 import random
 
+# fmt: off
 words = [
     'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuzz',
     'access', 'accident', 'account', 'accuse', 'ace', 'achieve', 'achy', 'acid', 'acned', 'acoustic',
@@ -253,6 +254,7 @@ words = [
     'woven', 'wrap', 'wreck', 'wrestle', 'wrist', 'write', 'wrong', 'wroth', 'wry', 'yard', 'year', 'yellow',
     'you', 'young', 'youth', 'yucky', 'yummy', 'zany', 'zebra', 'zero', 'zesty', 'zippy', 'zonal', 'zone', 'zoo'
 ]
+# fmt: on
 
 
 def generate_id():
@@ -261,9 +263,10 @@ def generate_id():
     # Realistically, k=2 is plenty, but to reduce collisions
     # where I have to retry creating an ID and making another
     # DB call, I went with k = 3 instead
-    return '-'.join(random.choices(words, k=3))
+    return "-".join(random.choices(words, k=3))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # print(sorted(list(set(words))))
     for _ in range(0, 100):
         print(generate_id())
