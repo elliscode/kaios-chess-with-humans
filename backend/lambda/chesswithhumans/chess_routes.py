@@ -1,0 +1,166 @@
+from utils import (
+    dynamo,
+    format_response,
+    parse_body,
+    TABLE_NAME,
+    python_obj_to_dynamo_obj,
+    dynamo_obj_to_python_obj,
+)
+from input_validation import (
+    validate_word_id,
+    validate_letter_id,
+    validate_username,
+    validate_schema,
+    validate_move,
+)
+import time
+import bad_words
+import words_ids
+import letter_ids
+import io
+import chess
+import chess.pgn
+
+CREATE_GAME_SCHEMA = {
+    "type": dict,
+    "fields": [
+        {"type": validate_word_id, "name": "game_id"},
+        {"type": validate_username, "name": "player_one_username"},
+    ]
+}
+JOIN_GAME_SCHEMA = {
+    "type": dict,
+    "fields": [
+        {"type": validate_word_id, "name": "game_id"},
+        {"type": validate_username, "name": "player_two_username"},
+    ]
+}
+MAKE_MOVE_SCHEMA = {
+    "type": dict,
+    "fields": [
+        {"type": validate_word_id, "name": "game_id"},
+        {"type": validate_letter_id, "name": "password"},
+        {"type": validate_move, "name": "move"},
+    ]
+}
+FETCH_GAME_SCHEMA = {
+    "type": dict,
+    "fields": [
+        {"type": validate_word_id, "name": "game_id"},
+        {"type": validate_letter_id, "name": "password"},
+    ]
+}
+
+
+#    game = parse_pgn_game(game_owner_data["pgn_string"])
+def parse_pgn_game(pgn_string):
+    return chess.pgn.read_game(io.StringIO(pgn_string)).end()
+
+
+def create_game_route(event):
+    # check if the ID for the join is in the database
+    body = validate_schema(parse_body(event["body"]), CREATE_GAME_SCHEMA)
+    player_one_username = body["player_one_username"]
+    if bad_words.has_bad_word(player_one_username):
+        return format_response(
+            event=event,
+            http_code=400,
+            body='We have detected inappropriate language in your username. If this is an error, '
+                 'please create a support ticket in the "Help" menu and we will whitelist the name.',
+        )
+    # if its an acceptable username, create a new game and send back the invite link
+    player_one_password = letter_ids.generate_id()
+    game_id = words_ids.generate_id()
+    # Initialize a game object
+    game = chess.pgn.Game()
+    exporter = chess.pgn.StringExporter(headers=False, variations=True, comments=False)
+    pgn_string = game.accept(exporter)
+    # Write it to the database
+    write_response = dynamo.put_item(
+        TableName=TABLE_NAME,
+        Item=python_obj_to_dynamo_obj(
+            {
+                "key1": "game",
+                "key2": game_id,
+                "player_one_username": player_one_username,
+                "player_one_password": player_one_password,
+                "pgn_string": pgn_string,
+                "expiration": int(time.time()) + (7 * 24 * 60 * 60),
+            }
+        ),
+    )
+    if 'ConsumedCapacity' not in write_response:
+        return format_response(
+            event=event,
+            http_code=507,
+            body="Could not write to the database. Whatever you were trying to do, it did not happen.",
+        )
+    # Return the 1st player ID and the current gameboard
+    return format_response(
+        event=event,
+        http_code=200,
+        body={
+            "game_id": game_id,
+            "player_one_username": player_one_username,
+            "player_one_password": player_one_password,
+            "pgn_string": pgn_string,
+        },
+    )
+
+def join_game_route(event):
+    body = validate_schema(parse_body(event["body"]), JOIN_GAME_SCHEMA)
+    player_two_username = body["player_two_username"]
+    if bad_words.has_bad_word(player_two_username):
+        return format_response(
+            event=event,
+            http_code=400,
+            body='We have detected inappropriate language in your username. If this is an error, '
+                 'please create a support ticket in the "Help" menu and we will whitelist the name.',
+        )
+    # check if the game exists
+    game_id = body["game_id"]
+    response = dynamo.get_item(
+        TableName=TABLE_NAME,
+        Key=python_obj_to_dynamo_obj({"key1": "game", "key2": game_id}),
+    )
+    if "Item" not in response:
+        return format_response(
+            event=event,
+            http_code=404,
+            body="Game ID not found in the database",
+        )
+    # If it is, store a 2nd player password
+    game_owner_data = dynamo_obj_to_python_obj(response["Item"])
+    player_two_password = letter_ids.generate_id()
+    game_owner_data["player_two_username"] = player_two_username
+    game_owner_data["player_two_password"] = player_two_password
+    # Write it to the database
+    write_response = dynamo.put_item(
+        TableName=TABLE_NAME,
+        Item=python_obj_to_dynamo_obj(game_owner_data),
+    )
+    if 'ConsumedCapacity' not in write_response:
+        return format_response(
+            event=event,
+            http_code=507,
+            body="Could not write to the database. Whatever you were trying to do, it did not happen.",
+        )
+    # Return the 2nd player ID and the current gameboard
+    return format_response(
+        event=event,
+        http_code=200,
+        body={
+            "game_id": game_id,
+            "player_two_username": player_two_username,
+            "player_one_password": player_two_password,
+            "pgn_string": game_owner_data["pgn_string"],
+        },
+    )
+
+
+if __name__ == '__main__':
+    # print(sorted(list(set(words))))
+    for _ in range(0, 100):
+        id_var = words_ids.generate_id()
+        print(id_var, not not validate_word_id(id_var))
+    pass
