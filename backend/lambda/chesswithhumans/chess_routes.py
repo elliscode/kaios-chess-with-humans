@@ -1,4 +1,4 @@
-from utils import (
+from .utils import (
     dynamo,
     format_response,
     parse_body,
@@ -6,7 +6,7 @@ from utils import (
     python_obj_to_dynamo_obj,
     dynamo_obj_to_python_obj,
 )
-from input_validation import (
+from .input_validation import (
     validate_word_id,
     validate_letter_id,
     validate_username,
@@ -14,9 +14,9 @@ from input_validation import (
     validate_move,
 )
 import time
-import bad_words
-import words_ids
-import letter_ids
+from . import bad_words
+from . import words_ids
+from . import letter_ids
 import io
 import chess
 import chess.pgn
@@ -24,7 +24,7 @@ import chess.pgn
 CREATE_GAME_SCHEMA = {
     "type": dict,
     "fields": [
-        {"type": validate_word_id, "name": "game_id"},
+        {"type": str, "name": "device_id"},
         {"type": validate_username, "name": "player_one_username"},
     ],
 }
@@ -33,6 +33,13 @@ JOIN_GAME_SCHEMA = {
     "fields": [
         {"type": validate_word_id, "name": "game_id"},
         {"type": validate_username, "name": "player_two_username"},
+    ],
+}
+GET_GAME_SCHEMA = {
+    "type": dict,
+    "fields": [
+        {"type": validate_word_id, "name": "game_id"},
+        {"type": validate_letter_id, "name": "password"},
     ],
 }
 MAKE_MOVE_SCHEMA = {
@@ -53,8 +60,57 @@ FETCH_GAME_SCHEMA = {
 
 
 #    game = parse_pgn_game(game_owner_data["pgn_string"])
-def parse_pgn_game(pgn_string):
+def parse_pgn_game(pgn_string) -> chess.pgn.GameNode:
     return chess.pgn.read_game(io.StringIO(pgn_string)).end()
+
+
+def get_game_route(event):
+    body = validate_schema(parse_body(event["body"]), GET_GAME_SCHEMA)
+    game_id = body["game_id"]
+    response = dynamo.get_item(
+        TableName=TABLE_NAME,
+        Key=python_obj_to_dynamo_obj({"key1": "game", "key2": game_id}),
+    )
+    if "Item" not in response:
+        return format_response(
+            event=event,
+            http_code=404,
+            body="Game ID not found in the database",
+        )
+    # If it is, check passwords
+    game_data = dynamo_obj_to_python_obj(response["Item"])
+    if game_data["player_one_password"] == body["password"]:
+        player_id = 1
+    elif game_data["player_two_password"] == body["password"]:
+        player_id = 2
+    else:
+        return format_response(
+            event=event,
+            http_code=401,
+            body="Player is not allowed to play",
+        )
+    pieces = []
+    try:
+        gameNode: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
+        pieceMap: dict[int, chess.Piece] = gameNode.board().piece_map()
+        for square, piece in pieceMap.items():
+            pieces.append({"position": chess.square_name(square), "piece": piece.symbol()})
+    except:
+        return format_response(
+            event=event,
+            http_code=500,
+            body="This game is not valid, please start a new game and abandon this game",
+        )
+    return format_response(
+        event=event,
+        http_code=200,
+        body={
+            "game_id": game_id,
+            "player_id": player_id,
+            "pieces": pieces,
+            # "pgn_string": game_data["pgn_string"],
+        },
+    )
 
 
 def create_game_route(event):
@@ -89,7 +145,12 @@ def create_game_route(event):
             }
         ),
     )
-    if "ConsumedCapacity" not in write_response:
+    print(write_response)
+    if (
+        "ResponseMetadata" not in write_response
+        or "HTTPStatusCode" not in write_response["ResponseMetadata"]
+        or write_response["ResponseMetadata"]["HTTPStatusCode"] != 200
+    ):
         return format_response(
             event=event,
             http_code=507,
@@ -131,16 +192,20 @@ def join_game_route(event):
             body="Game ID not found in the database",
         )
     # If it is, store a 2nd player password
-    game_owner_data = dynamo_obj_to_python_obj(response["Item"])
+    game_data = dynamo_obj_to_python_obj(response["Item"])
     player_two_password = letter_ids.generate_id()
-    game_owner_data["player_two_username"] = player_two_username
-    game_owner_data["player_two_password"] = player_two_password
+    game_data["player_two_username"] = player_two_username
+    game_data["player_two_password"] = player_two_password
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
-        Item=python_obj_to_dynamo_obj(game_owner_data),
+        Item=python_obj_to_dynamo_obj(game_data),
     )
-    if "ConsumedCapacity" not in write_response:
+    if (
+        "ResponseMetadata" not in write_response
+        or "HTTPStatusCode" not in write_response["ResponseMetadata"]
+        or write_response["ResponseMetadata"]["HTTPStatusCode"] != 200
+    ):
         return format_response(
             event=event,
             http_code=507,
@@ -153,10 +218,17 @@ def join_game_route(event):
         body={
             "game_id": game_id,
             "player_two_username": player_two_username,
-            "player_one_password": player_two_password,
-            "pgn_string": game_owner_data["pgn_string"],
+            "player_two_password": player_two_password,
+            "pgn_string": game_data["pgn_string"],
         },
     )
+
+
+def make_move_route(event):
+    body = validate_schema(parse_body(event["body"]), MAKE_MOVE_SCHEMA)
+    game_id = body["game_id"]
+    password = body["password"]
+    move = body["move"]
 
 
 if __name__ == "__main__":

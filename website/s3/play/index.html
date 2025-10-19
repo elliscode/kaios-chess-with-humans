@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Game Test Page</title>
+  <meta name="description" content="Path forwarding test for Cloudfront Distribution">
+  <meta name="author" content="Daniel Ellis Townsend">
+  <meta name="viewport" content="width=device-width">
+  <style>
+  </style>
+</head>
+
+<body>
+  <h1>This is a test page</h1>
+  <p>The game ID you requested is: <span id="game-text"></span></p>
+  <script>
+const gameText = document.getElementById("game-text");
+parts = window.location.pathname.split('/');
+gameText.innerText = parts[parts.length - 1];
+  </script>
+
+</body>
+
+</html>

@@ -7,13 +7,17 @@ import traceback
 from chesswithhumans.utils import (
     format_response,
     path_equals,
+)
+from chesswithhumans.chess_routes import (
     join_game_route,
+    create_game_route,
+    get_game_route,
 )
 
 
 def lambda_handler(event, context):
     try:
-        print(event)  # Only logging headers, I don't want to log people's GPS location passed in "body"
+        print(event)
         result = route(event)
         print(result)
         return result
@@ -29,6 +33,10 @@ def lambda_handler(event, context):
 #
 # see https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#simple_requests
 def route(event):
+    if path_equals(event=event, method="POST", path="/get"):
+        return get_game_route(event)
     if path_equals(event=event, method="POST", path="/join"):
         return join_game_route(event)
+    if path_equals(event=event, method="POST", path="/create"):
+        return create_game_route(event)
     return format_response(event=event, http_code=403, body={"message": "Forbidden"})
