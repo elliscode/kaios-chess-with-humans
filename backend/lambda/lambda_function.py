@@ -12,6 +12,7 @@ from chesswithhumans.chess_routes import (
     join_game_route,
     create_game_route,
     get_game_route,
+    make_move_route,
 )
 
 
@@ -39,4 +40,6 @@ def route(event):
         return join_game_route(event)
     if path_equals(event=event, method="POST", path="/create"):
         return create_game_route(event)
+    if path_equals(event=event, method="POST", path="/move"):
+        return make_move_route(event)
     return format_response(event=event, http_code=403, body={"message": "Forbidden"})
