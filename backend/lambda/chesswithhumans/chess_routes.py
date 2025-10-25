@@ -24,15 +24,15 @@ import chess.pgn
 CREATE_GAME_SCHEMA = {
     "type": dict,
     "fields": [
-        {"type": str, "name": "device_id"},
-        {"type": validate_username, "name": "player_one_username"},
+        # {"type": str, "name": "device_id"},
+        # {"type": validate_username, "name": "player_one_username"},
     ],
 }
 JOIN_GAME_SCHEMA = {
     "type": dict,
     "fields": [
         {"type": validate_word_id, "name": "game_id"},
-        {"type": validate_username, "name": "player_two_username"},
+        # {"type": validate_username, "name": "player_two_username"},
     ],
 }
 GET_GAME_SCHEMA = {
@@ -92,14 +92,14 @@ def get_game_route(event):
     pieces = {}
     legal_moves = []
     try:
-        gameNode: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
-        pieceMap: dict[int, chess.Piece] = gameNode.board().piece_map()
-        whose_turn: int = 1 if gameNode.turn() else 2
+        game_node: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
+        pieceMap: dict[int, chess.Piece] = game_node.board().piece_map()
+        whose_turn: int = 1 if game_node.turn() else 2
         for square, piece in pieceMap.items():
             if piece.symbol() not in pieces:
                 pieces[piece.symbol()] = []
             pieces[piece.symbol()].append(chess.square_name(square))
-        for move in gameNode.board().legal_moves:
+        for move in game_node.board().legal_moves:
             legal_moves.append(move.uci())
     except:
         return format_response(
@@ -123,7 +123,7 @@ def get_game_route(event):
 def create_game_route(event):
     # check if the ID for the join is in the database
     body = validate_schema(parse_body(event["body"]), CREATE_GAME_SCHEMA)
-    player_one_username = body["player_one_username"]
+    player_one_username = 'Player 1' # body["player_one_username"]
     if bad_words.has_bad_word(player_one_username):
         return format_response(
             event=event,
@@ -176,7 +176,7 @@ def create_game_route(event):
 
 def join_game_route(event):
     body = validate_schema(parse_body(event["body"]), JOIN_GAME_SCHEMA)
-    player_two_username = body["player_two_username"]
+    player_two_username = 'Player 2' # body["player_two_username"]
     if bad_words.has_bad_word(player_two_username):
         return format_response(
             event=event,
@@ -196,8 +196,14 @@ def join_game_route(event):
             http_code=404,
             body="Game ID not found in the database",
         )
-    # If it is, store a 2nd player password
     game_data = dynamo_obj_to_python_obj(response["Item"])
+    # If it is, check if someone already joined
+    if "player_two_password" in game_data:
+        return format_response(
+            event=event,
+            http_code=400,
+            body="Someone has already joined",
+        )
     player_two_password = letter_ids.generate_id()
     game_data["player_two_username"] = player_two_username
     game_data["player_two_password"] = player_two_password
@@ -255,15 +261,15 @@ def make_move_route(event):
         )
     move = body["move"]
     try:
-        gameNode: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
-        whose_turn: int = 1 if gameNode.turn() else 2
+        game_node: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
+        whose_turn: int = 1 if game_node.turn() else 2
         if whose_turn != player_id:
             return format_response(
                 event=event,
                 http_code=500,
                 body="It is not your turn",
             )
-        gameNode = gameNode.add_variation(chess.Move.from_uci(move))
+        game_node = game_node.add_variation(chess.Move.from_uci(move))
     except:
         return format_response(
             event=event,
@@ -272,7 +278,7 @@ def make_move_route(event):
         )
     # Initialize a game object
     exporter = chess.pgn.StringExporter(headers=False, variations=True, comments=False)
-    pgn_string = gameNode.accept(exporter)
+    pgn_string = game_node.game().accept(exporter)
     game_data["pgn_string"] = pgn_string
     game_data["expiration"] = int(time.time()) + (7 * 24 * 60 * 60)
     # Write it to the database
@@ -293,14 +299,14 @@ def make_move_route(event):
     pieces = {}
     legal_moves = []
     try:
-        gameNode: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
-        pieceMap: dict[int, chess.Piece] = gameNode.board().piece_map()
-        whose_turn: int = 1 if gameNode.turn() else 2
+        game_node: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
+        pieceMap: dict[int, chess.Piece] = game_node.board().piece_map()
+        whose_turn: int = 1 if game_node.turn() else 2
         for square, piece in pieceMap.items():
             if piece.symbol() not in pieces:
                 pieces[piece.symbol()] = []
             pieces[piece.symbol()].append(chess.square_name(square))
-        for move in gameNode.board().legal_moves:
+        for move in game_node.board().legal_moves:
             legal_moves.append(move.uci())
     except:
         return format_response(

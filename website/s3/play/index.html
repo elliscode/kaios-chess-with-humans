@@ -8,6 +8,35 @@
   <meta name="author" content="Daniel Ellis Townsend">
   <meta name="viewport" content="width=device-width">
   <style>
+.row {
+  width: 100vw;
+  display:flex;
+}
+.cell {
+  width: calc(100vw / 8);
+  height: calc(100vw / 8);
+  font-size: calc(100vw / 10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 900;
+}
+.cell * {
+  pointer-events: none;
+}
+.cell:hover, .potential {
+  box-shadow: inset 0 0 0 5px dodgerblue;
+}
+.active, .active:hover {
+  box-shadow: inset 0 0 0 5px rgb(44, 225, 31);
+}
+.white {
+  background-color: #C19A6B;
+}
+.black {
+  background-color: #5C4033;
+}
   </style>
 </head>
 
@@ -15,9 +44,143 @@
   <h1>This is a test page</h1>
   <p>The game ID you requested is: <span id="game-text"></span></p>
   <script>
-const gameText = document.getElementById("game-text");
-parts = window.location.pathname.split('/');
-gameText.innerText = parts[parts.length - 1];
+let data = undefined;
+function loadPage() {
+  const gameText = document.getElementById("game-text");
+  const parts = window.location.pathname.split('/');
+  gameText.innerText = parts[parts.length - 1];
+  if (gameText) {
+    let attemptToJoin = true;
+    const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
+    if (currentGamesListString) {
+      const currentGamesList = JSON.parse(currentGamesListString)
+      const currentGame = currentGamesList.find(x=>x.game_id==gameText.innerText);
+      if (currentGame) {
+        attemptToJoin = false;
+        fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/get', {
+          method: "POST",
+          body: JSON.stringify({
+            "game_id": currentGame.game_id,
+            "password": currentGame.password
+          })
+        }).then(x=>x.json()).then(jsonData=>{
+          data = jsonData;
+          // const pre = document.createElement('pre');
+          // pre.innerText = JSON.stringify(data, undefined, 2);
+          // document.body.appendChild(pre);
+          buildChessBoard();
+          drawChessBoard();
+        })
+      }
+    }
+    if (attemptToJoin) {
+      fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/join', {
+        method: "POST",
+        body: JSON.stringify({
+          "game_id": gameText.innerText
+        })
+      }).then(x=>x.json()).then(jsonData=>{
+        data = jsonData;
+        // const pre = document.createElement('pre');
+        // pre.innerText = JSON.stringify(data, undefined, 2);
+        // document.body.appendChild(pre);
+        currentGamesList = [];
+        const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
+        if (currentGamesListString) {
+          currentGamesList = JSON.parse(currentGamesListString);
+        }
+        currentGamesList.push({
+          game_id: data.game_id,
+          password: data.player_two_password
+        });
+        localStorage.setItem('chess-with-humans-games-list', JSON.stringify(currentGamesList));
+        loadPage();
+      })
+    }
+  }
+}
+function buildChessBoard() {
+  let board = document.createElement('div');
+  let colIds = ['a','b','c','d','e','f','g','h'];
+  let rowIds = ['1','2','3','4','5','6','7','8'];
+  if (data.player_id == 1) {
+    rowIds.reverse()
+  } else {
+    colIds.reverse()
+  }
+  let white = true;
+  for (let rowId of rowIds) {
+    let row = document.createElement('div');
+    row.classList.add('row');
+    for (let colId of colIds) {
+      let cell = document.createElement('div');
+      cell.addEventListener('click', touchSquare);
+      cell.id = colId + rowId;
+      cell.classList.add('cell');
+      cell.classList.add(white ? 'white' : 'black');
+      white = !white;
+      row.appendChild(cell);
+    }
+    white = !white;
+    board.appendChild(row);
+  }
+  document.body.appendChild(board);
+}
+function drawChessBoard() {
+  Array.from(document.querySelectorAll('.cell')).forEach(x=>x.innerText='');
+  for (let pieceType of Object.keys(data.pieces)) {
+    for (let coord of data.pieces[pieceType]) {
+      let square = document.querySelector(`#${coord}`);
+      square.innerText = pieceType;
+      square.style.color = pieceType.toLowerCase() != pieceType ? 'white' : 'black';
+    }
+  }
+}
+function touchSquare(event) {
+  let action = 'select-square'
+  if (event.target.classList.contains('active')) {
+    action = 'clear'
+  } else if (event.target.classList.contains('potential')) {
+    action = 'make-move'
+  }
+  if (action == 'select-square') {
+    Array.from(document.querySelectorAll('.potential')).forEach(x=>x.classList.remove('potential'));
+    Array.from(document.querySelectorAll('.active')).forEach(x=>x.classList.remove('active'));
+    event.target.classList.add('active');
+    for (let legalMove of data.legal_moves) {
+      if (legalMove.startsWith(event.target.id)) {
+        document.getElementById(legalMove.substring(2, 5)).classList.add('potential');
+      }
+    }
+  } else if ('make-move') {
+    let startSpot = document.querySelector('.active').id;
+    let endSpot = event.target.id;
+    let move = startSpot + endSpot;
+    Array.from(document.querySelectorAll('.potential')).forEach(x=>x.classList.remove('potential'));
+    Array.from(document.querySelectorAll('.active')).forEach(x=>x.classList.remove('active'));
+
+    const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
+    if (currentGamesListString) {
+      const currentGamesList = JSON.parse(currentGamesListString)
+      const currentGame = currentGamesList.find(x=>x.game_id==data.game_id);
+      fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/move', {
+        method: "POST",
+        body: JSON.stringify({
+          "game_id": currentGame.game_id,
+          "password": currentGame.password,
+          "move": move,
+        })
+      }).then(x=>x.json()).then(jsonData=>{
+        data = jsonData;
+        // const pre = document.createElement('pre');
+        // pre.innerText = JSON.stringify(data, undefined, 2);
+        // document.body.appendChild(pre);
+        drawChessBoard();
+      })
+    }
+  }
+}
+loadPage();
   </script>
 
 </body>

@@ -14,7 +14,7 @@
 <body>
   <h1>Chess With Humans</h1>
   <p>To start a game, press the button below:</p>
-  <button>Start Game</button>
+  <button onclick="startGame(event);">Start Game</button>
   <p>To join a game, click the link that got sent to you.</p>
   <div id="current-games">
   <p>You are currently playing in the following games:</p>
@@ -24,18 +24,44 @@
 const GAMES_LIST_ID = "chess-with-humans-games-list"
 const currentGamesList = document.getElementById('current-games-list');
 function getLocalGamesList() {
+  while (currentGamesList.firstElementChild) {
+    currentGamesList.firstElementChild.remove();
+  }
   let gamesListString = localStorage.getItem('chess-with-humans-games-list');
   if (gamesListString) {
-    let gamesList = JSON.parse(gameListString);
+    let gamesList = JSON.parse(gamesListString);
     for (let game of gamesList) {
       let element = document.createElement('li');
       let elementA = document.createElement('a');
-      elementA.innerText = game.id;
-      elementA.href = `/play/${game.id}`;
+      elementA.innerText = game.game_id;
+      elementA.href = `/play/${game.game_id}`;
       element.appendChild(elementA);
       currentGamesList.appendChild(element);
     }
   }
+}
+function startGame(event) {
+  let currentGamesList = [];
+  const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
+  if (currentGamesListString) {
+    currentGamesList = JSON.parse(currentGamesListString);
+  }
+  fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/create', {
+    method: "POST",
+    body: JSON.stringify({})
+  }).then(x=>x.json()).then(jsonData=>{
+    data = jsonData;
+    // const pre = document.createElement('pre');
+    // pre.innerText = JSON.stringify(data, undefined, 2);
+    // document.body.appendChild(pre);
+    currentGamesList.push({
+      game_id: data.game_id,
+      password: data.player_one_password
+    });
+    localStorage.setItem('chess-with-humans-games-list', JSON.stringify(currentGamesList));
+    getLocalGamesList();
+    window.location.assign(`/play/${data.game_id}`);
+  })
 }
 getLocalGamesList();
   </script>
