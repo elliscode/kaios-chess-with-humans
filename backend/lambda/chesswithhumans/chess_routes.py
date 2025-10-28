@@ -50,6 +50,13 @@ MAKE_MOVE_SCHEMA = {
         {"type": validate_move, "name": "move"},
     ],
 }
+CHECK_TURN_SCHEMA = {
+    "type": dict,
+    "fields": [
+        {"type": validate_word_id, "name": "game_id"},
+        {"type": validate_letter_id, "name": "password"},
+    ],
+}
 FETCH_GAME_SCHEMA = {
     "type": dict,
     "fields": [
@@ -112,10 +119,10 @@ def get_game_route(event):
         http_code=200,
         body={
             "game_id": game_id,
-            "player_id": player_id,
             "whose_turn": whose_turn,
             "pieces": pieces,
             "legal_moves": legal_moves,
+            "player_id": player_id,
         },
     )
 
@@ -149,6 +156,7 @@ def create_game_route(event):
                 "player_one_password": player_one_password,
                 "pgn_string": pgn_string,
                 "expiration": int(time.time()) + (7 * 24 * 60 * 60),
+                "whose_turn": int(1),
             }
         ),
     )
@@ -281,6 +289,7 @@ def make_move_route(event):
     pgn_string = game_node.game().accept(exporter)
     game_data["pgn_string"] = pgn_string
     game_data["expiration"] = int(time.time()) + (7 * 24 * 60 * 60)
+    game_data["whose_turn"] = 1 if whose_turn == 2 else 2
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
@@ -322,7 +331,52 @@ def make_move_route(event):
             "whose_turn": whose_turn,
             "pieces": pieces,
             "legal_moves": legal_moves,
+            "player_id": player_id,
         },
+    )
+
+
+def check_turn_route(event):
+    body = validate_schema(parse_body(event["body"]), CHECK_TURN_SCHEMA)
+    game_id = body["game_id"]
+    response = dynamo.get_item(
+        TableName=TABLE_NAME,
+        Key=python_obj_to_dynamo_obj({"key1": "game", "key2": game_id}),
+    )
+    if "Item" not in response:
+        return format_response(
+            event=event,
+            http_code=404,
+            body="Game ID not found in the database",
+        )
+    # If it is, check passwords
+    game_data = dynamo_obj_to_python_obj(response["Item"])
+    if game_data["player_one_password"] == body["password"]:
+        player_id = 1
+    elif game_data["player_two_password"] == body["password"]:
+        player_id = 2
+    else:
+        return format_response(
+            event=event,
+            http_code=401,
+            body="Player is not allowed to play",
+        )
+    if "whose_turn" in game_data:
+        whose_turn = game_data["whose_turn"]
+    else:
+        try:
+            game_node: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
+            whose_turn: int = 1 if game_node.turn() else 2
+        except:
+            return format_response(
+                event=event,
+                http_code=500,
+                body="This game is not valid, please start a new game and abandon this game",
+            )
+    return format_response(
+        event=event,
+        http_code=200 if whose_turn == player_id else 204,
+        body={},
     )
 
 

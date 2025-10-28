@@ -9,6 +9,7 @@ from chesswithhumans.utils import (
     path_equals,
 )
 from chesswithhumans.chess_routes import (
+    check_turn_route,
     join_game_route,
     create_game_route,
     get_game_route,
@@ -42,4 +43,6 @@ def route(event):
         return create_game_route(event)
     if path_equals(event=event, method="POST", path="/move"):
         return make_move_route(event)
+    if path_equals(event=event, method="POST", path="/is-it-my-turn"):
+        return check_turn_route(event)
     return format_response(event=event, http_code=403, body={"message": "Forbidden"})
