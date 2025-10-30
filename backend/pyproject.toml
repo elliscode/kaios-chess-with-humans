@@ -1,2 +1,19 @@
+[project]
+name = "kaios-chess-with-humans"
+version = "0.1.0"
+description = ""
+requires-python = ">=3.14"
+dependencies = [
+    "boto3",
+    "chess",
+]
+
+[tool.uv]
+index-url = "https://pypi.org/simple"
+dev-dependencies = [
+    "black",
+]
+
+
 [tool.black]
 line-length = 120
