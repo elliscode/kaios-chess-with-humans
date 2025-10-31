@@ -7,7 +7,7 @@ fi
 
 if $lambda; then
     cd lambda/
-    cp -r $(pipenv --venv)/lib/python3.14/site-packages/chess .
+    cp -r ../.venv/lib/python3.14/site-packages/chess .
     TIMESTAMP=$(date +%s)
     zip -vr ../lambda-release-${ENV}-${TIMESTAMP}.zip . -x "*.DS_Store" -x "*.test.py" -x "*__pycache__/*"
     rm -r chess/

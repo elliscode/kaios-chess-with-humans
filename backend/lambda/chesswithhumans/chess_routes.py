@@ -114,16 +114,21 @@ def get_game_route(event):
             http_code=500,
             body="This game is not valid, please start a new game and abandon this game",
         )
+    output = {
+        "game_id": game_id,
+        "whose_turn": whose_turn,
+        "pieces": pieces,
+        "legal_moves": legal_moves,
+        "player_id": player_id,
+    }
+    if "previous_move" in game_data:
+        output["previous_move"] = game_data["previous_move"]
+    if "piece_taken" in game_data:
+        output["piece_taken"] = game_data["piece_taken"]
     return format_response(
         event=event,
         http_code=200,
-        body={
-            "game_id": game_id,
-            "whose_turn": whose_turn,
-            "pieces": pieces,
-            "legal_moves": legal_moves,
-            "player_id": player_id,
-        },
+        body=output,
     )
 
 
@@ -268,16 +273,25 @@ def make_move_route(event):
             body="Player is not allowed to play",
         )
     move = body["move"]
+    piece_taken = None
     try:
-        game_node: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
-        whose_turn: int = 1 if game_node.turn() else 2
+        previous_node: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
+        whose_turn: int = 1 if previous_node.turn() else 2
         if whose_turn != player_id:
             return format_response(
                 event=event,
                 http_code=500,
                 body="It is not your turn",
             )
-        game_node = game_node.add_variation(chess.Move.from_uci(move))
+        game_node = previous_node.add_variation(chess.Move.from_uci(move))
+        if previous_node.board().is_capture(game_node.move):
+            piece_location = game_node.move.to_square
+            if previous_node.board().is_en_passant(game_node.move):
+                file = chess.square_file(game_node.move.to_square)
+                rank = chess.square_rank(game_node.move.from_square)
+                piece_location = file + (8 * rank)
+            piece: str = previous_node.board().piece_at(piece_location).symbol()
+            piece_taken = { piece: [ chess.square_name(piece_location) ] }
     except:
         return format_response(
             event=event,
@@ -290,6 +304,10 @@ def make_move_route(event):
     game_data["pgn_string"] = pgn_string
     game_data["expiration"] = int(time.time()) + (7 * 24 * 60 * 60)
     game_data["whose_turn"] = 1 if whose_turn == 2 else 2
+    game_data["previous_move"] = move
+    game_data.pop("piece_taken", None)
+    if piece_taken:
+        game_data["piece_taken"] = piece_taken
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
@@ -323,16 +341,21 @@ def make_move_route(event):
             http_code=500,
             body="This game is not valid, please start a new game and abandon this game",
         )
+    output = {
+        "game_id": game_id,
+        "whose_turn": whose_turn,
+        "pieces": pieces,
+        "legal_moves": legal_moves,
+        "player_id": player_id,
+    }
+    if "previous_move" in game_data:
+        output["previous_move"] = game_data["previous_move"]
+    if piece_taken:
+        output["piece_taken"] = piece_taken
     return format_response(
         event=event,
         http_code=200,
-        body={
-            "game_id": game_id,
-            "whose_turn": whose_turn,
-            "pieces": pieces,
-            "legal_moves": legal_moves,
-            "player_id": player_id,
-        },
+        body=output,
     )
 
 
