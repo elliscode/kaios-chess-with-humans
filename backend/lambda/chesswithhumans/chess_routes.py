@@ -121,8 +121,12 @@ def get_game_route(event):
         "legal_moves": legal_moves,
         "player_id": player_id,
     }
+    if "en_passant" in game_data:
+        output["en_passant"] = game_data["en_passant"]
     if "previous_move" in game_data:
         output["previous_move"] = game_data["previous_move"]
+    if "graveyard" in game_data:
+        output["graveyard"] = game_data["graveyard"]
     if "piece_taken" in game_data:
         output["piece_taken"] = game_data["piece_taken"]
     return format_response(
@@ -273,6 +277,8 @@ def make_move_route(event):
             body="Player is not allowed to play",
         )
     move = body["move"]
+    graveyard = game_data.get("graveyard", [])
+    en_passant = False
     piece_taken = None
     try:
         previous_node: chess.pgn.GameNode = parse_pgn_game(game_data["pgn_string"])
@@ -287,11 +293,13 @@ def make_move_route(event):
         if previous_node.board().is_capture(game_node.move):
             piece_location = game_node.move.to_square
             if previous_node.board().is_en_passant(game_node.move):
+                en_passant = True
                 file = chess.square_file(game_node.move.to_square)
                 rank = chess.square_rank(game_node.move.from_square)
                 piece_location = file + (8 * rank)
             piece: str = previous_node.board().piece_at(piece_location).symbol()
             piece_taken = { piece: [ chess.square_name(piece_location) ] }
+            graveyard.append(piece)
     except:
         return format_response(
             event=event,
@@ -305,6 +313,8 @@ def make_move_route(event):
     game_data["expiration"] = int(time.time()) + (7 * 24 * 60 * 60)
     game_data["whose_turn"] = 1 if whose_turn == 2 else 2
     game_data["previous_move"] = move
+    game_data["en_passant"] = en_passant
+    game_data["graveyard"] = graveyard
     game_data.pop("piece_taken", None)
     if piece_taken:
         game_data["piece_taken"] = piece_taken
@@ -348,8 +358,12 @@ def make_move_route(event):
         "legal_moves": legal_moves,
         "player_id": player_id,
     }
+    if "en_passant" in game_data:
+        output["en_passant"] = game_data["en_passant"]
     if "previous_move" in game_data:
         output["previous_move"] = game_data["previous_move"]
+    if "graveyard" in game_data:
+        output["graveyard"] = game_data["graveyard"]
     if piece_taken:
         output["piece_taken"] = piece_taken
     return format_response(
