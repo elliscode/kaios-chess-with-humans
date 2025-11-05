@@ -386,7 +386,7 @@ function startConnection(event) {
   });
 }
 function maintainWebSocket(event) {
-  if (!socket || socket.readyState != WebSocket.OPEN) {
+  if (data && data.game_id && (!socket || socket.readyState != WebSocket.OPEN)) {
     startConnection(event);
   }
 }

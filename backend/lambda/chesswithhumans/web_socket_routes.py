@@ -22,21 +22,17 @@ REGISTER_SCHEMA = {
 
 def register_websocket_id(connection_id, body):
     game_id = body['game_id']
-    print(game_id)
     password = body['password']
-    print(password)
     response = dynamo.get_item(
         TableName=TABLE_NAME,
         Key=python_obj_to_dynamo_obj({"key1": "game", "key2": game_id}),
     )
-    print(response)
     if "Item" not in response:
         output = {"statusCode": 400, "body": f"Could not register {connection_id} for game {game_id} because game_id is not found in the database"}
         print(output)
         return output
     # If it is, check passwords
     game_data = dynamo_obj_to_python_obj(response["Item"])
-    print(game_data)
     if game_data["player_one_password"] == password:
         connection_id_key = "player_one_connection_id"
     elif game_data["player_two_password"] == password:
@@ -45,11 +41,7 @@ def register_websocket_id(connection_id, body):
         output = {"statusCode": 400, "body": f"Could not register {connection_id} for game {game_id} as the wrong password was provided"}
         print(output)
         return output
-    print(connection_id_key)
     game_data[connection_id_key] = connection_id
-    print(game_data)
-    response_text = f"Registered {connection_id} for game {game_id}"
-    print(game_data)
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
         Item=python_obj_to_dynamo_obj(game_data)
@@ -59,22 +51,24 @@ def register_websocket_id(connection_id, body):
         or "HTTPStatusCode" not in write_response["ResponseMetadata"]
         or write_response["ResponseMetadata"]["HTTPStatusCode"] != 200
     ):
-        return {"statusCode": 400, "body": f"Could not register {connection_id} for game {game_id} due to db connection issue"}
+        output = {"statusCode": 400, "body": f"Could not register {connection_id} for game {game_id} due to db connection issue"}
+        print(output)
+        return output
     # Send a response back to this same connection
+    event_text = "registered"
+    if connection_id_key == "player_one_connection_id" and game_data['whose_turn'] == 1:
+        event_text = "move"
+    elif connection_id_key == "player_two_connection_id" and game_data['whose_turn'] == 2:
+        event_text = "move"
     apigw.post_to_connection(
         ConnectionId=connection_id,
-        Data=json.dumps({"event": "registered"})
+        Data=json.dumps({"event": event_text})
     )
-    print(response_text)
-    return {"statusCode": 200, "body": response_text}
+    output = {"statusCode": 200, "body": f"Registered {connection_id} for game {game_id}"}
+    print(output)
+    return output
 
 def web_socket_route(event, context):
-    """
-    Handles WebSocket events from API Gateway:
-      - $connect
-      - $disconnect
-      - custom route (e.g., sendMessage)
-    """
     route = event.get("requestContext", {}).get("routeKey")
     connection_id = event.get("requestContext", {}).get("connectionId")
 
