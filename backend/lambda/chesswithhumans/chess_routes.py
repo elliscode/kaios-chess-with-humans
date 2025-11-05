@@ -5,6 +5,8 @@ from .utils import (
     TABLE_NAME,
     python_obj_to_dynamo_obj,
     dynamo_obj_to_python_obj,
+    apigw,
+    json,
 )
 from .input_validation import (
     validate_word_id,
@@ -351,6 +353,23 @@ def make_move_route(event):
             http_code=500,
             body="This game is not valid, please start a new game and abandon this game",
         )
+    connection_id = None
+    if player_id == 1 and 'player_two_connection_id' in game_data:
+        connection_id = game_data['player_two_connection_id']
+    elif player_id == 2 and 'player_one_connection_id' in game_data:
+        connection_id = game_data['player_one_connection_id']
+    if connection_id:
+        print(f"Writing message to {connection_id}")
+        try:
+            apigw.post_to_connection(
+                ConnectionId=connection_id,
+                Data=json.dumps({"event": "move"})
+            )
+        except apigw.exceptions.GoneException as e:
+            print(f"{connection_id} no longer active, not sending any messages")
+    else:
+        print("Not sending any messages")
+
     output = {
         "game_id": game_id,
         "whose_turn": whose_turn,

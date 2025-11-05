@@ -7,7 +7,7 @@
   <meta name="description" content="Path forwarding test for Cloudfront Distribution">
   <meta name="author" content="Daniel Ellis Townsend">
   <meta name="viewport" content="width=device-width">
-  <meta name="theme-color" content="#222" />
+  <meta name="theme-color" content="#333" />
   <style>
 /* latin */
 @font-face {
@@ -235,6 +235,7 @@ function buildChessBoard() {
 function drawChessBoard() {
   Array.from(document.querySelectorAll('.cell')).forEach(x=>x.innerText='');
   Array.from(document.getElementsByTagName('img')).forEach(x=>x.remove());
+  Array.from(document.getElementsByClassName('tombstone')).forEach(x=>x.remove());
   Array.from(document.querySelectorAll('.previous')).forEach(x=>x.classList.remove('previous'));
   for (let pieceType of Object.keys(data.pieces)) {
     for (let coord of data.pieces[pieceType]) {
@@ -252,6 +253,7 @@ function drawChessBoard() {
       let clonedPiece = document.getElementById(`piece-${pieceType.toLowerCase()}`).cloneNode(true);
       clonedPiece.id = '';
       clonedPiece.classList.add(`${color}-piece`);
+      clonedPiece.classList.add(`tombstone`);
       document.getElementById(`${color}-graveyard`).appendChild(clonedPiece);
   }
   if (data.previous_move) {
@@ -326,40 +328,71 @@ function performMove(move) {
     })
   }
 }
-function checkIfItIsYourTurnAndRefreshIfSo(event) {
-  if (document.visibilityState == 'visible' && data.whose_turn != data.player_id) {
+let socket = undefined;
+let creatingSocket = false;
+function startConnection(event) {
+  if (creatingSocket) {
+    return;
+  }
+  creatingSocket = true;
+  // Create a new WebSocket connection
+  socket = new WebSocket('wss://59ms2wie22.execute-api.us-east-1.amazonaws.com/dev/');
+
+  // When the connection is established
+  socket.addEventListener('open', (event) => {
+    console.log('Connected to WebSocket server.');
+    // register the websocket with the game id and the password
     const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
     if (currentGamesListString) {
       const currentGamesList = JSON.parse(currentGamesListString)
       const currentGame = currentGamesList.find(x=>x.game_id==data.game_id);
-      fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/is-it-my-turn', {
-        method: "POST",
-        body: JSON.stringify({
-          "game_id": currentGame.game_id,
-          "password": currentGame.password
-        })
-      }).then(x=>{
-        if (x.status == 200) {
-          fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/get', {
-            method: "POST",
-            body: JSON.stringify({
-              "game_id": currentGame.game_id,
-              "password": currentGame.password
-            })
-          }).then(x=>x.json()).then(jsonData=>{
-            data = jsonData;
-            // const pre = document.createElement('pre');
-            // pre.innerText = JSON.stringify(data, undefined, 2);
-            // document.body.appendChild(pre);
-            drawChessBoard();
-          })
-        }
-      })
+      socket.send(JSON.stringify({ action: 'register', message: {"game_id": currentGame.game_id, "password": currentGame.password}}));
+      // socket created, you can run this code again if needed
+      creatingSocket = false;
     }
+  });
+
+  // When a message is received
+  socket.addEventListener('message', (event) => {
+    console.log('Message from server:', event.data);
+    let messageData = JSON.parse(event.data);
+    if (messageData.event == 'move') {
+      const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
+      if (currentGamesListString) {
+        const currentGamesList = JSON.parse(currentGamesListString)
+        const currentGame = currentGamesList.find(x=>x.game_id==data.game_id);
+        fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/get', {
+          method: "POST",
+          body: JSON.stringify({
+            "game_id": currentGame.game_id,
+            "password": currentGame.password
+          })
+        }).then(x=>x.json()).then(jsonData=>{
+          data = jsonData;
+          drawChessBoard();
+        });
+      }
+    }
+  });
+
+  // When the connection closes
+  socket.addEventListener('close', (event) => {
+    console.log('Connection closed:', event.code, event.reason);
+  });
+
+  // When an error occurs
+  socket.addEventListener('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+}
+function maintainWebSocket(event) {
+  if (!socket || socket.readyState != WebSocket.OPEN) {
+    startConnection(event);
   }
 }
 loadPage();
-setInterval(checkIfItIsYourTurnAndRefreshIfSo, 3000);
+maintainWebSocket();
+setInterval(maintainWebSocket, 1000);
   </script>
 
 </body>

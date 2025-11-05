@@ -15,12 +15,15 @@ from chesswithhumans.chess_routes import (
     get_game_route,
     make_move_route,
 )
+from chesswithhumans.web_socket_routes import (
+    web_socket_route,
+)
 
 
 def lambda_handler(event, context):
     try:
-        print(event)
-        result = route(event)
+        print(event, context)
+        result = route(event, context)
         print(result)
         return result
     except Exception:
@@ -34,7 +37,7 @@ def lambda_handler(event, context):
 # only leaves POST as an option, as GET has its body removed by AWS somehow
 #
 # see https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#simple_requests
-def route(event):
+def route(event, context):
     if path_equals(event=event, method="POST", path="/get"):
         return get_game_route(event)
     if path_equals(event=event, method="POST", path="/join"):
@@ -45,4 +48,6 @@ def route(event):
         return make_move_route(event)
     if path_equals(event=event, method="POST", path="/is-it-my-turn"):
         return check_turn_route(event)
+    if 'requestContext' in event and 'routeKey' in event['requestContext']:
+        return web_socket_route(event, context)
     return format_response(event=event, http_code=403, body={"message": "Forbidden"})

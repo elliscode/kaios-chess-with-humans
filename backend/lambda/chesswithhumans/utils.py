@@ -6,7 +6,9 @@ from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
 DOMAIN_NAME = os.environ.get("DOMAIN_NAME")
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME")
+APIGW_WS_ENDPOINT = os.environ.get("APIGW_WS_ENDPOINT")
 
+apigw = boto3.client("apigatewaymanagementapi", endpoint_url=APIGW_WS_ENDPOINT)
 dynamo = boto3.client("dynamodb")
 
 
@@ -50,6 +52,6 @@ def python_obj_to_dynamo_obj(python_obj: dict) -> dict:
 
 
 def path_equals(event, method, path):
-    event_path = event["path"]
-    event_method = event["httpMethod"]
+    event_path = event.get("path")
+    event_method = event.get("httpMethod")
     return event_method == method and (event_path == path or event_path == path + "/" or path == "*")
