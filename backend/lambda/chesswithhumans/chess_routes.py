@@ -122,6 +122,8 @@ def get_game_route(event):
         "pieces": pieces,
         "legal_moves": legal_moves,
         "player_id": player_id,
+        "is_check": game_node.board().is_check(),
+        "is_checkmate": game_node.board().is_checkmate(),
     }
     if "en_passant" in game_data:
         output["en_passant"] = game_data["en_passant"]
@@ -376,6 +378,8 @@ def make_move_route(event):
         "pieces": pieces,
         "legal_moves": legal_moves,
         "player_id": player_id,
+        "is_check": game_node.board().is_check(),
+        "is_checkmate": game_node.board().is_checkmate(),
     }
     if "en_passant" in game_data:
         output["en_passant"] = game_data["en_passant"]

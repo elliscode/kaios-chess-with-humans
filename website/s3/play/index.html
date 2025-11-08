@@ -49,18 +49,9 @@ body {
 .cell * {
   pointer-events: none;
 }
-.previous {
-  box-shadow: inset 0 0 0 5px rgb(255, 219, 59);
-}
-.cell:hover, .potential {
-  box-shadow: inset 0 0 0 5px dodgerblue;
-}
 .cell img, .cell svg {
   width: 100%;
   height: 100%;
-}
-.active, .active:hover {
-  box-shadow: inset 0 0 0 5px rgb(44, 225, 31);
 }
 .white {
   background-color: #C19A6B;
@@ -89,19 +80,53 @@ body {
   width: 100%;
   height: 100%;
   z-index: 10;
-  background-color: rgba(255, 255, 255, 0.842);
+  background-color: #3333338a;
   display:flex;
   justify-content: center;
   align-items: center;
 }
 .modal {
-  min-width: 200px;
-  min-height: 200px;
-  background-color: white;
+  width: calc(6 * min(100vw, 8 * 100vh / 9) / 8);
+  height: calc(6 * min(100vw, 8 * 100vh / 9) / 8);
+  background-color: #333;
   border: 1px solid black;
+  display:flex;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.modal button {
+  cursor: pointer;
+  margin:0;
+  padding:0;
+  width: calc(min(100vw, 8 * 100vh / 9) / 4);
+  height: calc(min(100vw, 8 * 100vh / 9) / 4);
+  border-width: 0;
+  margin: 5px;
+}
+.modal img, .modal svg {
+  width: calc(min(100vw, 8 * 100vh / 9) / 4);
+  height: calc(min(100vw, 8 * 100vh / 9) / 4);
+  pointer-events: none;
 }
 .hidden {
   display:none;
+}
+.previous {
+  box-shadow: inset 0 0 0 5px rgb(255, 219, 59); /*rgb(196, 196, 196)*/
+}
+.check {
+  box-shadow: inset 0 0 0 5px rgb(255, 128, 0);
+}
+.cell:hover, .potential {
+  box-shadow: inset 0 0 0 5px dodgerblue;
+}
+.active, .active:hover {
+  box-shadow: inset 0 0 0 5px rgb(44, 225, 31);
+}
+.checkmate {
+  box-shadow: inset 0 0 0 5px rgb(182, 0, 0);
 }
   </style>
 </head>
@@ -117,11 +142,10 @@ body {
   <p class="hidden">The game ID you requested is: <span id="game-text"></span></p>
   <div id="promotion-modal" class="modal-bg" style="display:none;">
     <div class="modal">
-      <h3>Which piece would you like to promote to?</h3>
-      <button id="promote-to-bishop" onclick="performMove(event);">Bishop</button>
-      <button id="promote-to-rook" onclick="performMove(event);">Rook</button>
-      <button id="promote-to-knight" onclick="performMove(event);">Knight</button>
-      <button id="promote-to-queen" onclick="performMove(event);">Queen</button>
+      <button class="promote-button" id="promote-to-q" onclick="performMove(event);">Queen</button>
+      <button class="promote-button" id="promote-to-r" onclick="performMove(event);">Rook</button>
+      <button class="promote-button" id="promote-to-b" onclick="performMove(event);">Bishop</button>
+      <button class="promote-button" id="promote-to-n" onclick="performMove(event);">Knight</button>
     </div>
   </div>
   <div class="hidden">
@@ -220,12 +244,36 @@ function buildChessBoard() {
     board.appendChild(row);
   }
   boardDiv.appendChild(board);
+  // fill in the buttons for promotion
+  for (let promoteButton of Array.from(document.getElementsByClassName('promote-button'))) {
+    let pieceType = promoteButton.id.slice(-1);
+    let color = data.whose_turn == 1 ? 'white' : 'black';
+    let clonedPiece = document.getElementById(`piece-${pieceType.toLowerCase()}`).cloneNode(true);
+    clonedPiece.id = '';
+    clonedPiece.classList.add(`promotion-piece`);
+    promoteButton.innerHTML = '';
+    promoteButton.appendChild(clonedPiece);
+  }
 }
 function drawChessBoard() {
   Array.from(document.querySelectorAll('.cell')).forEach(x=>x.innerText='');
   Array.from(document.getElementsByTagName('img')).forEach(x=>x.remove());
   Array.from(document.getElementsByClassName('tombstone')).forEach(x=>x.remove());
   Array.from(document.querySelectorAll('.previous')).forEach(x=>x.classList.remove('previous'));
+  Array.from(document.querySelectorAll('.check')).forEach(x=>x.classList.remove('check'));
+  Array.from(document.querySelectorAll('.checkmate')).forEach(x=>x.classList.remove('checkmate'));
+  let kingStatus = undefined;
+  if (data.is_checkmate) { 
+    kingStatus = 'checkmate';
+  } else if (data.is_check) {
+    kingStatus = 'check';
+  }
+  kingInStatus = undefined;
+  if (kingStatus && data.whose_turn == 1) {
+    kingInStatus = 'K';
+  } else if (kingStatus && data.whose_turn == 2) {
+    kingInStatus = 'k';
+  }
   for (let pieceType of Object.keys(data.pieces)) {
     for (let coord of data.pieces[pieceType]) {
       let square = document.querySelector(`#${coord}`);
@@ -234,6 +282,9 @@ function drawChessBoard() {
       clonedPiece.id = '';
       clonedPiece.classList.add(`${color}-piece`);
       square.appendChild(clonedPiece);
+      if (kingInStatus == pieceType) {
+        square.classList.add(kingStatus);
+      }
     }
   }
   promotionModal.style.display = 'none';
@@ -280,10 +331,15 @@ function touchSquare(event) {
     if (possibleMoves.length == 1) {
       performMove(move);
     } else if (possibleMoves.length > 1) {
-      document.getElementById('promote-to-bishop').setAttribute('move', possibleMoves.find(x=>x.endsWith('b')));
-      document.getElementById('promote-to-knight').setAttribute('move', possibleMoves.find(x=>x.endsWith('n')));
-      document.getElementById('promote-to-queen').setAttribute('move', possibleMoves.find(x=>x.endsWith('q')));
-      document.getElementById('promote-to-rook').setAttribute('move', possibleMoves.find(x=>x.endsWith('r')));
+      document.getElementById('promote-to-b').setAttribute('move', possibleMoves.find(x=>x.endsWith('b')));
+      document.getElementById('promote-to-n').setAttribute('move', possibleMoves.find(x=>x.endsWith('n')));
+      document.getElementById('promote-to-q').setAttribute('move', possibleMoves.find(x=>x.endsWith('q')));
+      document.getElementById('promote-to-r').setAttribute('move', possibleMoves.find(x=>x.endsWith('r')));
+      const promoteButtons = Array.from(document.getElementsByClassName('promote-button'));
+      promoteButtons.forEach(x=>x.classList.remove('white'));
+      promoteButtons.forEach(x=>x.classList.remove('black'));
+      promoteButtons.forEach(x=>x.classList.add(event.target.classList.contains('white') ? 'white' : 'black'));
+      promoteButtons.forEach(x=>x.querySelector('img, svg').classList.add(data.whose_turn == 1 ? `white-piece` : 'black-piece'));
       promotionModal.style.display = 'flex';
     }
   } else {
@@ -345,7 +401,7 @@ function startConnection(event) {
   socket.addEventListener('message', (event) => {
     console.log('Message from server:', event.data);
     let messageData = JSON.parse(event.data);
-    if (messageData.event == 'move') {
+    if (messageData.event == 'move' && data.whose_turn != data.player_id) {
       const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
       if (currentGamesListString) {
         const currentGamesList = JSON.parse(currentGamesListString)
