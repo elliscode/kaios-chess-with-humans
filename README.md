@@ -9,3 +9,7 @@ The backend runs on AWS. It uses AWS DynamoDB database for storage, AWS Lambda f
 ## Frontend
 
 TODO
+
+## Website
+
+The website is a CloudFront distribution pointing to an S3 bucket, which talks to the backend.
