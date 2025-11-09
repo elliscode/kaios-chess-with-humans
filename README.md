@@ -1,4 +1,4 @@
-# Chess with humans
+# KaiOS Chess with humans
 
 Making a chess game for KaiOS to play with other humans, as there are no offerings on the KaiStore that allow playing chess with other humans.
 
