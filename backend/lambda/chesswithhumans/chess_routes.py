@@ -124,6 +124,9 @@ def get_game_route(event):
         "player_id": player_id,
         "is_check": game_node.board().is_check(),
         "is_checkmate": game_node.board().is_checkmate(),
+        "is_stalemate": game_node.board().is_stalemate(),
+        # "is_fivefold_repetition": game_node.board().is_fivefold_repetition(),
+        # "is_seventyfive_moves": game_node.board().is_seventyfive_moves(),
     }
     if "en_passant" in game_data:
         output["en_passant"] = game_data["en_passant"]
@@ -380,6 +383,9 @@ def make_move_route(event):
         "player_id": player_id,
         "is_check": game_node.board().is_check(),
         "is_checkmate": game_node.board().is_checkmate(),
+        "is_stalemate": game_node.board().is_stalemate(),
+        # "is_fivefold_repetition": game_node.board().is_fivefold_repetition(),
+        # "is_seventyfive_moves": game_node.board().is_seventyfive_moves(),
     }
     if "en_passant" in game_data:
         output["en_passant"] = game_data["en_passant"]

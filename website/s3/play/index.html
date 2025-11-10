@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <title>Chess with Humans</title>
-  <meta name="description" content="Path forwarding test for Cloudfront Distribution">
+  <meta name="description" content="Chess with Humans - Game">
   <meta name="author" content="Daniel Ellis Townsend">
   <meta name="viewport" content="width=device-width">
   <meta name="theme-color" content="#333" />
@@ -124,6 +124,9 @@ body {
 }
 .active, .active:hover {
   box-shadow: inset 0 0 0 5px rgb(44, 225, 31);
+}
+.stalemate {
+  box-shadow: inset 0 0 0 5px rgb(128, 128, 128);
 }
 .checkmate {
   box-shadow: inset 0 0 0 5px rgb(182, 0, 0);
@@ -267,6 +270,8 @@ function drawChessBoard() {
     kingStatus = 'checkmate';
   } else if (data.is_check) {
     kingStatus = 'check';
+  } else if (data.is_stalemate) {
+    kingStatus = 'stalemate'
   }
   kingInStatus = undefined;
   if (kingStatus && data.whose_turn == 1) {
@@ -288,13 +293,26 @@ function drawChessBoard() {
     }
   }
   promotionModal.style.display = 'none';
-  for (let pieceType of data.graveyard) {
+  let graveyard = Array.from(data.graveyard);
+  let pieceTaken = [];
+  if (data.piece_taken) {
+    pieceTaken = Object.keys(data.piece_taken);
+  }
+  for (let pieceType of ['Q', 'R', 'B', 'N', 'P', 'q', 'r', 'b', 'n', 'p']) {
+    while (graveyard.includes(pieceType)) {
+      graveyard.splice(graveyard.indexOf(pieceType), 1);
       let color = pieceType.toLowerCase() != pieceType ? 'white' : 'black';
       let clonedPiece = document.getElementById(`piece-${pieceType.toLowerCase()}`).cloneNode(true);
       clonedPiece.id = '';
       clonedPiece.classList.add(`${color}-piece`);
       clonedPiece.classList.add(`tombstone`);
-      document.getElementById(`${color}-graveyard`).appendChild(clonedPiece);
+      if (pieceTaken.includes(pieceType)) {
+        pieceTaken.pop();
+        clonedPiece.classList.add(`previous`);
+      }
+      let graveyardDom = document.getElementById(`${color}-graveyard`);
+      graveyardDom.insertBefore(clonedPiece, graveyardDom.firstElementChild);
+    }
   }
   if (data.previous_move) {
     const start = data.previous_move.substring(0,2);
