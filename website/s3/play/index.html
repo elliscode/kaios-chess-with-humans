@@ -457,15 +457,21 @@ function startConnection(event) {
   });
 }
 function maintainWebSocket(event) {
-  if (data && data.game_id && (!socket || socket.readyState != WebSocket.OPEN) && document.hasFocus() && data.whose_turn != data.player_id) {
+  if (data && data.game_id && (!socket || socket.readyState != WebSocket.OPEN) && checkIsPageActive() && data.whose_turn != data.player_id) {
     startConnection(event);
   }
 }
-// window.addEventListener('blur', function() {
-//   if (socket && socket.readyState == WebSocket.OPEN) {
-//     socket.close();
-//   }
-// });
+let isPageActive = true;
+function checkIsPageActive() {
+  return document.hasFocus() || isPageActive;
+}
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+        isPageActive = true;
+    } else {
+        isPageActive = false;
+    }
+});
 loadPage();
 maintainWebSocket();
 setInterval(maintainWebSocket, 1000);
