@@ -26,15 +26,14 @@ import chess.pgn
 CREATE_GAME_SCHEMA = {
     "type": dict,
     "fields": [
-        # {"type": str, "name": "device_id"},
-        # {"type": validate_username, "name": "player_one_username"},
+        {"type": validate_username, "name": "player_one_username"},
     ],
 }
 JOIN_GAME_SCHEMA = {
     "type": dict,
     "fields": [
         {"type": validate_word_id, "name": "game_id"},
-        # {"type": validate_username, "name": "player_two_username"},
+        {"type": validate_username, "name": "player_two_username"},
     ],
 }
 GET_GAME_SCHEMA = {
@@ -125,9 +124,13 @@ def get_game_route(event):
         "is_check": game_node.board().is_check(),
         "is_checkmate": game_node.board().is_checkmate(),
         "is_stalemate": game_node.board().is_stalemate(),
+        "player_one_username": game_data["player_one_username"],
+        "expiration": int(game_data["expiration"]),
         # "is_fivefold_repetition": game_node.board().is_fivefold_repetition(),
         # "is_seventyfive_moves": game_node.board().is_seventyfive_moves(),
     }
+    if "player_two_username" in game_data:
+        output["player_two_username"] = game_data["player_two_username"]
     if "en_passant" in game_data:
         output["en_passant"] = game_data["en_passant"]
     if "previous_move" in game_data:
@@ -146,7 +149,13 @@ def get_game_route(event):
 def create_game_route(event):
     # check if the ID for the join is in the database
     body = validate_schema(parse_body(event["body"]), CREATE_GAME_SCHEMA)
-    player_one_username = 'Player 1' # body["player_one_username"]
+    player_one_username = body.get("player_one_username")
+    if not player_one_username or len(player_one_username) > 16:
+        return format_response(
+            event=event,
+            http_code=400,
+            body="Your username is invalid, please try again.",
+        )
     if bad_words.has_bad_word(player_one_username):
         return format_response(
             event=event,
@@ -200,7 +209,13 @@ def create_game_route(event):
 
 def join_game_route(event):
     body = validate_schema(parse_body(event["body"]), JOIN_GAME_SCHEMA)
-    player_two_username = 'Player 2' # body["player_two_username"]
+    player_two_username = body.get("player_two_username")
+    if not player_two_username or len(player_two_username) > 16:
+        return format_response(
+            event=event,
+            http_code=400,
+            body="Your username is invalid, please try again.",
+        )
     if bad_words.has_bad_word(player_two_username):
         return format_response(
             event=event,
@@ -384,9 +399,13 @@ def make_move_route(event):
         "is_check": game_node.board().is_check(),
         "is_checkmate": game_node.board().is_checkmate(),
         "is_stalemate": game_node.board().is_stalemate(),
+        "player_one_username": game_data["player_one_username"],
+        "expiration": int(game_data["expiration"]),
         # "is_fivefold_repetition": game_node.board().is_fivefold_repetition(),
         # "is_seventyfive_moves": game_node.board().is_seventyfive_moves(),
     }
+    if "player_two_username" in game_data:
+        output["player_two_username"] = game_data["player_two_username"]
     if "en_passant" in game_data:
         output["en_passant"] = game_data["en_passant"]
     if "previous_move" in game_data:

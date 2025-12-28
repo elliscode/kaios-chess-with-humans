@@ -172,3 +172,5 @@ logfile
 Pipfile.lock
 
 *.test.py
+
+bad_words.txt

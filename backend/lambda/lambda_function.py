@@ -51,3 +51,8 @@ def route(event, context):
     if 'requestContext' in event and 'routeKey' in event['requestContext']:
         return web_socket_route(event, context)
     return format_response(event=event, http_code=403, body={"message": "Forbidden"})
+
+if __name__ == "__main__":
+    # Unit testing here, not committing
+    # the tests for obvious reasons...
+    pass
