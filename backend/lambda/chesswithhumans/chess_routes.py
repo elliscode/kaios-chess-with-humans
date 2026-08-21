@@ -11,6 +11,7 @@ from .utils import (
 from .input_validation import (
     validate_word_id,
     validate_letter_id,
+    validate_elo_key,
     validate_username,
     validate_schema,
     validate_move,
@@ -19,14 +20,19 @@ import time
 from . import bad_words
 from . import words_ids
 from . import letter_ids
+from . import profile_routes
 import io
 import chess
 import chess.pgn
+
+GAME_EXPIRATION_SECONDS = 6 * 24 * 60 * 60  # forfeit-eligible after 6 days of no move
+GAME_TTL_SECONDS = 90 * 24 * 60 * 60  # DynamoDB TTL, kept generous so forfeits can still be resolved/seen
 
 CREATE_GAME_SCHEMA = {
     "type": dict,
     "fields": [
         {"type": validate_username, "name": "player_one_username"},
+        {"type": validate_elo_key, "name": "elo_key"},
     ],
 }
 JOIN_GAME_SCHEMA = {
@@ -34,6 +40,7 @@ JOIN_GAME_SCHEMA = {
     "fields": [
         {"type": validate_word_id, "name": "game_id"},
         {"type": validate_username, "name": "player_two_username"},
+        {"type": validate_elo_key, "name": "elo_key"},
     ],
 }
 GET_GAME_SCHEMA = {
@@ -72,6 +79,27 @@ def parse_pgn_game(pgn_string) -> chess.pgn.GameNode:
     return chess.pgn.read_game(io.StringIO(pgn_string)).end()
 
 
+def resolve_stale_game(game_data):
+    if game_data.get("game_over") or "player_two_username" not in game_data:
+        return game_data
+    if "game_expiration" not in game_data:
+        # Legacy game from before this field existed. We don't know when its
+        # last move actually happened, so start the forfeit clock now rather
+        # than treating it as already overdue.
+        game_data["game_expiration"] = int(time.time()) + GAME_EXPIRATION_SECONDS
+        dynamo.put_item(TableName=TABLE_NAME, Item=python_obj_to_dynamo_obj(game_data))
+        return game_data
+    if int(time.time()) < int(game_data["game_expiration"]):
+        return game_data
+    forfeiting_player = game_data.get("whose_turn", 1)
+    winner = 2 if forfeiting_player == 1 else 1
+    profile_routes.apply_elo_for_game_result(game_data, winner)
+    game_data["game_over"] = True
+    game_data["game_over_reason"] = "forfeit"
+    dynamo.put_item(TableName=TABLE_NAME, Item=python_obj_to_dynamo_obj(game_data))
+    return game_data
+
+
 def get_game_route(event):
     body = validate_schema(parse_body(event["body"]), GET_GAME_SCHEMA)
     game_id = body["game_id"]
@@ -97,6 +125,7 @@ def get_game_route(event):
             http_code=401,
             body="Player is not allowed to play",
         )
+    game_data = resolve_stale_game(game_data)
     pieces = {}
     legal_moves = []
     try:
@@ -126,9 +155,12 @@ def get_game_route(event):
         "is_stalemate": game_node.board().is_stalemate(),
         "player_one_username": game_data["player_one_username"],
         "expiration": int(game_data["expiration"]),
+        "game_over": game_data.get("game_over", False),
         # "is_fivefold_repetition": game_node.board().is_fivefold_repetition(),
         # "is_seventyfive_moves": game_node.board().is_seventyfive_moves(),
     }
+    if "game_over_reason" in game_data:
+        output["game_over_reason"] = game_data["game_over_reason"]
     if "player_two_username" in game_data:
         output["player_two_username"] = game_data["player_two_username"]
     if "en_passant" in game_data:
@@ -163,6 +195,13 @@ def create_game_route(event):
             body="We have detected inappropriate language in your username. If this is an error, "
             'please create a support ticket in the "Help" menu and we will whitelist the name.',
         )
+    profile = profile_routes.get_profile_item(profile_routes.profile_id_from_key(body["elo_key"]))
+    if not profile:
+        return format_response(
+            event=event,
+            http_code=400,
+            body="ELO key not recognized, please refresh and try again",
+        )
     # if its an acceptable username, create a new game and send back the invite link
     player_one_password = letter_ids.generate_id()
     game_id = words_ids.generate_id()
@@ -170,21 +209,23 @@ def create_game_route(event):
     game = chess.pgn.Game()
     exporter = chess.pgn.StringExporter(headers=False, variations=True, comments=False)
     pgn_string = game.accept(exporter)
-    expiration = int(time.time()) + (7 * 24 * 60 * 60)
+    expiration = int(time.time()) + GAME_TTL_SECONDS
+    game_expiration = int(time.time()) + GAME_EXPIRATION_SECONDS
+    item = {
+        "key1": "game",
+        "key2": game_id,
+        "player_one_username": player_one_username,
+        "player_one_password": player_one_password,
+        "player_one_profile_id": profile["key2"],
+        "pgn_string": pgn_string,
+        "expiration": expiration,
+        "game_expiration": game_expiration,
+        "whose_turn": int(1),
+    }
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
-        Item=python_obj_to_dynamo_obj(
-            {
-                "key1": "game",
-                "key2": game_id,
-                "player_one_username": player_one_username,
-                "player_one_password": player_one_password,
-                "pgn_string": pgn_string,
-                "expiration": expiration,
-                "whose_turn": int(1),
-            }
-        ),
+        Item=python_obj_to_dynamo_obj(item),
     )
     if (
         "ResponseMetadata" not in write_response
@@ -196,6 +237,7 @@ def create_game_route(event):
             http_code=507,
             body="Could not write to the database. Whatever you were trying to do, it did not happen.",
         )
+    profile_routes.add_game_to_profile(profile, game_id, player_one_password)
     # Return the 1st player ID and the current gameboard
     return format_response(
         event=event,
@@ -225,6 +267,13 @@ def join_game_route(event):
             body="We have detected inappropriate language in your username. If this is an error, "
             'please create a support ticket in the "Help" menu and we will whitelist the name.',
         )
+    profile = profile_routes.get_profile_item(profile_routes.profile_id_from_key(body["elo_key"]))
+    if not profile:
+        return format_response(
+            event=event,
+            http_code=400,
+            body="ELO key not recognized, please refresh and try again",
+        )
     # check if the game exists
     game_id = body["game_id"]
     response = dynamo.get_item(
@@ -248,7 +297,9 @@ def join_game_route(event):
     player_two_password = letter_ids.generate_id()
     game_data["player_two_username"] = player_two_username
     game_data["player_two_password"] = player_two_password
-    game_data["expiration"] = int(time.time()) + (7 * 24 * 60 * 60)
+    game_data["player_two_profile_id"] = profile["key2"]
+    game_data["expiration"] = int(time.time()) + GAME_TTL_SECONDS
+    game_data["game_expiration"] = int(time.time()) + GAME_EXPIRATION_SECONDS
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
@@ -264,6 +315,7 @@ def join_game_route(event):
             http_code=507,
             body="Could not write to the database. Whatever you were trying to do, it did not happen.",
         )
+    profile_routes.add_game_to_profile(profile, game_id, player_two_password)
     # Return the 2nd player ID and the current gameboard
     return format_response(
         event=event,
@@ -302,6 +354,13 @@ def make_move_route(event):
             http_code=401,
             body="Player is not allowed to play",
         )
+    game_data = resolve_stale_game(game_data)
+    if game_data.get("game_over"):
+        return format_response(
+            event=event,
+            http_code=409,
+            body="This game has already ended",
+        )
     move = body["move"]
     graveyard = game_data.get("graveyard", [])
     en_passant = False
@@ -336,7 +395,8 @@ def make_move_route(event):
     exporter = chess.pgn.StringExporter(headers=False, variations=True, comments=False)
     pgn_string = game_node.game().accept(exporter)
     game_data["pgn_string"] = pgn_string
-    game_data["expiration"] = int(time.time()) + (7 * 24 * 60 * 60)
+    game_data["expiration"] = int(time.time()) + GAME_TTL_SECONDS
+    game_data["game_expiration"] = int(time.time()) + GAME_EXPIRATION_SECONDS
     game_data["whose_turn"] = 1 if whose_turn == 2 else 2
     game_data["previous_move"] = move
     game_data["en_passant"] = en_passant
@@ -344,6 +404,16 @@ def make_move_route(event):
     game_data.pop("piece_taken", None)
     if piece_taken:
         game_data["piece_taken"] = piece_taken
+    if game_node.board().is_game_over() and not game_data.get("elo_applied"):
+        if game_node.board().is_checkmate():
+            winner = player_id
+            game_over_reason = "checkmate"
+        else:
+            winner = None
+            game_over_reason = "stalemate" if game_node.board().is_stalemate() else "draw"
+        profile_routes.apply_elo_for_game_result(game_data, winner)
+        game_data["game_over"] = True
+        game_data["game_over_reason"] = game_over_reason
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
@@ -405,9 +475,12 @@ def make_move_route(event):
         "is_stalemate": game_node.board().is_stalemate(),
         "player_one_username": game_data["player_one_username"],
         "expiration": int(game_data["expiration"]),
+        "game_over": game_data.get("game_over", False),
         # "is_fivefold_repetition": game_node.board().is_fivefold_repetition(),
         # "is_seventyfive_moves": game_node.board().is_seventyfive_moves(),
     }
+    if "game_over_reason" in game_data:
+        output["game_over_reason"] = game_data["game_over_reason"]
     if "player_two_username" in game_data:
         output["player_two_username"] = game_data["player_two_username"]
     if "en_passant" in game_data:
@@ -450,6 +523,7 @@ def check_turn_route(event):
             http_code=401,
             body="Player is not allowed to play",
         )
+    game_data = resolve_stale_game(game_data)
     if "whose_turn" in game_data:
         whose_turn = game_data["whose_turn"]
     else:

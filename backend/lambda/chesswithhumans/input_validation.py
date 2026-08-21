@@ -4,6 +4,7 @@ FLOAT_REGEX = "^[\\-]{0,1}\\d*[\\.]{0,1}\\d+$"
 WORD_ID_REGEX = "[a-z]+\\-[a-z]+\\-[a-z]+"
 LETTER_ID_REGEX = "[a-zA-Z0-9]{32}"
 ASCII_REGEX = "[\u0020-\u007e]+"
+ELO_KEY_REGEX = "^[a-z]+(-[a-z]+){4}$"
 
 
 def validate_move(value):
@@ -15,6 +16,14 @@ def validate_move(value):
 def validate_word_id(value):
     if isinstance(value, str) and re.match(WORD_ID_REGEX, value):
         return value
+    return None
+
+
+def validate_elo_key(value):
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if re.match(ELO_KEY_REGEX, normalized):
+            return normalized
     return None
 
 

@@ -1,1 +1,1 @@
-aws s3 sync s3 s3://daniel-townsend-kaios-gps-location-sharer --exclude "*env.js" --exclude "*.DS_Store" --delete
+aws s3 sync s3 s3://daniel-townsend-chess-with-humans --exclude "*env.js" --exclude "*.DS_Store" --delete

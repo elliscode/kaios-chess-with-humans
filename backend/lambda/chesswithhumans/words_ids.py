@@ -257,13 +257,13 @@ words = [
 # fmt: on
 
 
-def generate_id():
+def generate_id(k=3):
     # k = 2 --> 2772^2 --> 7.6 million
     # k = 3 --> 2772^3 --> 21.3 billion
     # Realistically, k=2 is plenty, but to reduce collisions
     # where I have to retry creating an ID and making another
     # DB call, I went with k = 3 instead
-    return "-".join(random.choices(words, k=3))
+    return "-".join(random.choices(words, k=k))
 
 
 if __name__ == "__main__":

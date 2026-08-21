@@ -15,6 +15,13 @@ from chesswithhumans.chess_routes import (
     get_game_route,
     make_move_route,
 )
+from chesswithhumans.profile_routes import (
+    create_profile_route,
+    get_profile_route,
+    update_profile_route,
+    game_lookup_route,
+    import_games_route,
+)
 from chesswithhumans.web_socket_routes import (
     web_socket_route,
 )
@@ -48,6 +55,16 @@ def route(event, context):
         return make_move_route(event)
     if path_equals(event=event, method="POST", path="/is-it-my-turn"):
         return check_turn_route(event)
+    if path_equals(event=event, method="POST", path="/profile/create"):
+        return create_profile_route(event)
+    if path_equals(event=event, method="POST", path="/profile/get"):
+        return get_profile_route(event)
+    if path_equals(event=event, method="POST", path="/profile/update"):
+        return update_profile_route(event)
+    if path_equals(event=event, method="POST", path="/profile/game-lookup"):
+        return game_lookup_route(event)
+    if path_equals(event=event, method="POST", path="/profile/import-games"):
+        return import_games_route(event)
     if 'requestContext' in event and 'routeKey' in event['requestContext']:
         return web_socket_route(event, context)
     return format_response(event=event, http_code=403, body={"message": "Forbidden"})

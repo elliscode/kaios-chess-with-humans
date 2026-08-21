@@ -59,12 +59,17 @@ button:active {
   font-size: x-large;
   padding: 10px 25px;
   border-radius: 40px;
+}
+#controls > button + button {
+  margin-top: 12px;
+}
+#controls > button.primary {
   background-color:dodgerblue;
 }
-#controls > button:hover {
+#controls > button.primary:hover {
   background-color:rgb(68, 161, 255);
 }
-#controls > button:active {
+#controls > button.primary:active {
   background-color:rgb(0, 126, 252);
 }
 #name-selector {
@@ -129,6 +134,73 @@ button:active {
 }
 .hidden {
   display:none;
+}
+.modal-bg {
+  position:fixed;
+  top:0;
+  left:0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background-color: #3333338a;
+  display:flex;
+  justify-content: center;
+  align-items: center;
+}
+.modal {
+  width: min(90vw, 500px);
+  max-height: 80vh;
+  overflow-y: auto;
+  background-color: #333;
+  border: 1px solid black;
+  border-radius: 20px;
+  padding: 20px 30px;
+  box-sizing: border-box;
+  display:flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal h2 {
+  margin: 0;
+}
+.modal p {
+  margin: 0;
+}
+.modal .warning {
+  color: #ffb84d;
+  font-weight: bold;
+}
+.modal input[type="text"] {
+  font-family: monospace;
+  font-size: medium;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background-color: #555;
+  border: 1px solid #888;
+  color: white;
+}
+.modal .field-row {
+  display:flex;
+  gap: 8px;
+  align-items: center;
+}
+.modal .field-row input[type="text"] {
+  flex-grow: 1;
+}
+.modal button {
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: medium;
+}
+.modal .stat-row {
+  display:flex;
+  justify-content: space-between;
+  font-size: large;
+}
+.modal .error-text {
+  color: #ff6b6b;
 }
 @media screen and (max-width:300px) {
   h1 {
@@ -274,12 +346,51 @@ button:active {
   <div id="controls">
     <div id="name-selector"><span>Username:</span><input id="username" type="text" oninput="setUsername(event);"/></div>
     <div id="current-games"><h2>Current Games</h2><div id="current-games-list"></div></div>
-    <button onclick="startGame(event);">Start New Game</button>
+    <button class="primary" onclick="startGame(event);">Start New Game</button>
+    <button onclick="openSettings();">Settings</button>
   </div>
+  </div>
+  <div id="welcome-modal" class="modal-bg" style="display:none;">
+    <div class="modal">
+      <h2>Welcome!</h2>
+      <p>We've created a permanent ELO Key for you. It tracks your rating and lets you log in on other devices.</p>
+      <p class="warning">WARNING: Treat your ELO key as you would treat a password. DO NOT SHARE your ELO key with anyone, and save a copy of it somewhere safe. If you lose your device, or want to log into your account on another device, type your ELO key into the app on that device.</p>
+      <input id="welcome-elo-key" type="text" readonly onclick="this.select();"/>
+      <div class="field-row">
+        <button onclick="copyEloKey('welcome-elo-key');">Copy</button>
+        <button onclick="dismissWelcomeModal();">I've saved it</button>
+      </div>
+    </div>
+  </div>
+  <div id="settings-modal" class="modal-bg" style="display:none;">
+    <div class="modal">
+      <h2>Settings</h2>
+      <div class="field-row">
+        <span>Username:</span>
+        <input id="settings-username" type="text" oninput="updateSettingsUsername(event);"/>
+      </div>
+      <div class="stat-row"><span>ELO</span><span id="settings-elo">-</span></div>
+      <div class="stat-row"><span>Wins</span><span id="settings-wins">-</span></div>
+      <div class="stat-row"><span>Losses</span><span id="settings-losses">-</span></div>
+      <div class="stat-row"><span>Draws</span><span id="settings-draws">-</span></div>
+      <p class="warning">WARNING: Treat your ELO key as you would treat a password. DO NOT SHARE your ELO key with anyone, and save a copy of it somewhere safe. If you lose your device, or want to log into your account on another device, type your ELO key into the app on that device.</p>
+      <div class="field-row">
+        <input id="settings-elo-key" type="text" readonly onclick="this.select();"/>
+        <button onclick="copyEloKey('settings-elo-key');">Copy</button>
+      </div>
+      <p>Log in with a different ELO key:</p>
+      <div class="field-row">
+        <input id="settings-login-key" type="text" placeholder="Paste ELO key"/>
+        <button onclick="loginWithEloKey(event);">Log In</button>
+      </div>
+      <p id="settings-login-error" class="error-text"></p>
+      <button onclick="closeSettings();">Close</button>
+    </div>
   </div>
   <script>
-let gamesList = undefined;
-const GAMES_LIST_ID = "chess-with-humans-games-list"
+const API_BASE = 'https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev';
+const ELO_KEY_STORAGE = 'chess-with-humans-elo-key';
+const LOCAL_GAMES_LIST_KEY = 'chess-with-humans-games-list';
 const currentGamesList = document.getElementById('current-games-list');
 const usernameInput = document.getElementById('username');
 function getCurrentUsername() {
@@ -294,39 +405,141 @@ function setUsername(event) {
   localStorage.setItem('chess-with-humans-username', event.target.value);
 }
 function setUi() {
-  getLocalGamesList();
   usernameInput.value = getCurrentUsername();
+  ensureProfile()
+    .then(migrateLocalGamesListIfPresent)
+    .then(getRemoteGamesList)
+    .catch(err => console.error('Could not load games list', err));
 }
-function getLocalGamesList() {
-  const unixTimeInSeconds = Math.floor(Date.now() / 1000);
-  while (currentGamesList.firstElementChild) {
-    currentGamesList.firstElementChild.remove();
+function postJson(url, requestBody) {
+  return fetch(url, {
+    method: "POST",
+    body: JSON.stringify(requestBody)
+  }).then(response => response.json().catch(() => ({})).then(jsonData => {
+    if (!response.ok) {
+      const error = new Error((jsonData && jsonData.message) || `Request failed with status ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+    return jsonData;
+  }));
+}
+function getStoredEloKey() {
+  return localStorage.getItem(ELO_KEY_STORAGE);
+}
+function ensureProfile() {
+  if (getStoredEloKey()) {
+    return Promise.resolve();
   }
-  let gamesListString = localStorage.getItem('chess-with-humans-games-list');
-  if (gamesListString) {
-    gamesList = JSON.parse(gamesListString);
-    validGamesList = [];
-    for (let game of gamesList) {
-      if (!game.expiration) {
-        // Legacy entry from before expiration tracking existed. We don't know
-        // its real backend TTL, but it can't outlive (now + 7 days) since
-        // that's the max TTL the backend ever sets, so use that as a bound.
-        game.expiration = unixTimeInSeconds + (7 * 24 * 60 * 60);
-      }
-      if (game.expiration < unixTimeInSeconds) {
-        continue;
-      }
+  return postJson(`${API_BASE}/profile/create`, {
+    username: getCurrentUsername(),
+  }).then(profile => {
+    localStorage.setItem(ELO_KEY_STORAGE, profile.elo_key);
+    showWelcomeModal(profile.elo_key);
+  });
+}
+function migrateLocalGamesListIfPresent() {
+  const listString = localStorage.getItem(LOCAL_GAMES_LIST_KEY);
+  if (!listString) {
+    return Promise.resolve();
+  }
+  let localList = [];
+  try {
+    localList = JSON.parse(listString);
+  } catch (e) {
+    localList = [];
+  }
+  if (!Array.isArray(localList) || localList.length === 0) {
+    localStorage.removeItem(LOCAL_GAMES_LIST_KEY);
+    return Promise.resolve();
+  }
+  const eloKey = getStoredEloKey();
+  return postJson(`${API_BASE}/profile/import-games`, {
+    elo_key: eloKey,
+    games: localList.map(g => ({ game_id: g.game_id, password: g.password })),
+  }).then(() => {
+    localStorage.removeItem(LOCAL_GAMES_LIST_KEY);
+  }).catch(err => {
+    // Leave the local list in place so migration retries on the next load
+    // rather than silently losing access to an in-progress game.
+    console.error('Could not migrate local games list, will retry later', err);
+  });
+}
+function showWelcomeModal(eloKey) {
+  document.getElementById('welcome-elo-key').value = eloKey;
+  document.getElementById('welcome-modal').style.display = 'flex';
+}
+function dismissWelcomeModal() {
+  document.getElementById('welcome-modal').style.display = 'none';
+}
+function copyEloKey(inputId) {
+  const input = document.getElementById(inputId);
+  input.select();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(input.value);
+  }
+}
+function openSettings() {
+  document.getElementById('settings-username').value = getCurrentUsername();
+  document.getElementById('settings-login-error').innerText = '';
+  document.getElementById('settings-modal').style.display = 'flex';
+  refreshSettingsProfile();
+}
+function closeSettings() {
+  document.getElementById('settings-modal').style.display = 'none';
+}
+function refreshSettingsProfile() {
+  const eloKey = getStoredEloKey();
+  if (!eloKey) return;
+  document.getElementById('settings-elo-key').value = eloKey;
+  postJson(`${API_BASE}/profile/get`, { elo_key: eloKey }).then(profile => {
+    document.getElementById('settings-elo').innerText = profile.elo;
+    document.getElementById('settings-wins').innerText = profile.wins;
+    document.getElementById('settings-losses').innerText = profile.losses;
+    document.getElementById('settings-draws').innerText = profile.draws;
+  }).catch(err => console.error('Could not load profile', err));
+}
+function updateSettingsUsername(event) {
+  setUsername(event);
+  const eloKey = getStoredEloKey();
+  if (!eloKey) return;
+  postJson(`${API_BASE}/profile/update`, { elo_key: eloKey, username: event.target.value })
+    .catch(err => console.error('Could not update username', err));
+}
+function loginWithEloKey(event) {
+  event.preventDefault();
+  const input = document.getElementById('settings-login-key');
+  const eloKey = input.value.trim();
+  const errorEl = document.getElementById('settings-login-error');
+  errorEl.innerText = '';
+  postJson(`${API_BASE}/profile/get`, { elo_key: eloKey }).then(profile => {
+    localStorage.setItem(ELO_KEY_STORAGE, eloKey);
+    localStorage.setItem('chess-with-humans-username', profile.username);
+    usernameInput.value = profile.username;
+    input.value = '';
+    refreshSettingsProfile();
+  }).catch(err => {
+    errorEl.innerText = err.status === 404 ? 'ELO key not recognized.' : 'Something went wrong, please try again.';
+  });
+}
+function joinGame(event) {
+  window.location.href = `/play/${event.target.getAttribute('game')}`;
+}
+function getRemoteGamesList() {
+  const eloKey = getStoredEloKey();
+  if (!eloKey) {
+    return Promise.resolve();
+  }
+  return postJson(`${API_BASE}/profile/get`, { elo_key: eloKey }).then(profile => {
+    while (currentGamesList.firstElementChild) {
+      currentGamesList.firstElementChild.remove();
+    }
+    for (let game of (profile.games || [])) {
       let element = document.createElement('div');
       element.classList.add('game-row');
       {
         let el = document.createElement('span');
-        if (game.username) {
-          el.innerText = `${game.username}`;
-        } else if (game.game_id) {
-          el.innerText = `${game.game_id}`;
-        } else {
-          continue;
-        }
+        el.innerText = `${game.game_id}`;
         element.appendChild(el);
       }
       {
@@ -337,41 +550,16 @@ function getLocalGamesList() {
         element.appendChild(el);
       }
       currentGamesList.appendChild(element);
-      validGamesList.push(game);
     }
-    gamesList = validGamesList;
-    localStorage.setItem('chess-with-humans-games-list', JSON.stringify(gamesList));
-  }
-}
-function joinGame(event) {
-  window.location.href = `/play/${event.target.getAttribute('game')}`;
-}
-async function getRemoteGamesList() {
-
+  });
 }
 function startGame(event) {
-  const username = getCurrentUsername();
-  let currentGamesList = [];
-  const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
-  if (currentGamesListString) {
-    currentGamesList = JSON.parse(currentGamesListString);
-  }
-  fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/create', {
-    method: "POST",
-    body: JSON.stringify({
-      "player_one_username": localStorage.getItem('chess-with-humans-username'),
-    })
-  }).then(x=>x.json()).then(jsonData=>{
-    data = jsonData;
-    currentGamesList.push({
-      game_id: data.game_id,
-      password: data.player_one_password,
-      expiration: data.expiration
-    });
-    localStorage.setItem('chess-with-humans-games-list', JSON.stringify(currentGamesList));
-    getLocalGamesList();
-    window.location.assign(`/play/${data.game_id}`);
-  })
+  ensureProfile().then(() => postJson(`${API_BASE}/create`, {
+    "player_one_username": localStorage.getItem('chess-with-humans-username'),
+    "elo_key": getStoredEloKey(),
+  })).then(jsonData=>{
+    window.location.assign(`/play/${jsonData.game_id}`);
+  }).catch(err => console.error('Could not start game', err));
 }
 setUi();
   </script>
