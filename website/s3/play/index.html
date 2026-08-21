@@ -172,6 +172,12 @@ body {
       <button class="promote-button" id="promote-to-n" onclick="performMove(event);">Knight</button>
     </div>
   </div>
+  <div id="error-modal" class="modal-bg" style="display:none;">
+    <div class="modal">
+      <p id="error-modal-message" style="width:100%;text-align:center;"></p>
+      <button onclick="window.location.assign('/');">Back to Lobby</button>
+    </div>
+  </div>
   <div class="hidden">
     <svg id="piece-b" width="1in" height="1in" viewBox="0 0 25.4 25.4" version="1.1" id="svg1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"><defs id="defs1" /><g id="layer4" style="display:inline"><path id="path6" style="display:inline;fill-opacity:1;stroke-width:2.54;stroke-linejoin:round;paint-order:markers stroke fill" d="m 7.5902372,12.12275 c -0.089115,4.079741 2.1125326,4.996595 2.1125326,4.996595 h 0.9870202 3.98477 0.98702 c 0,0 2.202164,-0.916854 2.113049,-4.996595 0,0 -0.509747,-4.3047753 -3.528969,-5.3625459 0,0 -0.469764,4.7525959 -1.566014,5.2985619 0.841266,-2.816562 0.892802,-4.0728443 0.06124,-5.7520422 C 10.195283,6.5231695 7.6690544,8.9111112 7.5902372,12.12275 Z" /><circle style="display:inline;fill-opacity:1;stroke-width:2.54;stroke-linejoin:round;paint-order:markers stroke fill" id="path5" cx="12.682432" cy="4.9851866" r="1.651" /><path id="rect7" style="display:inline;fill-opacity:1;stroke-width:2.54;stroke-linejoin:round;paint-order:markers stroke fill" d="M 9.7668484,17.676933 8.292003,19.207589 c 0,0 -0.6361539,0.0028 -1.6965373,0.01602 -1.0603833,0.01319 -1.1766723,1.128097 -1.1766723,1.128097 l -0.00362,1.714107 h 6.3148596 1.939934 6.31486 l -0.0036,-1.714107 c 0,0 -0.116288,-1.114907 -1.176672,-1.128097 -1.060384,-0.01319 -1.696537,-0.01602 -1.696537,-0.01602 l -1.475362,-1.530656 z" /></g></svg> 
     <svg id="piece-k" width="1in" height="1in" viewBox="0 0 25.4 25.4" version="1.1" id="svg1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg"><defs id="defs1" /><g id="layer5" style="display:inline"><path id="path7" style="fill-opacity:1;stroke-width:4.38912;stroke-linejoin:round;paint-order:markers stroke fill" d="m 11.412827,2.8646175 0.01082,1.9788189 -2.1744804,-0.016969 0.046426,2.4937634 2.1273474,0.00923 -0.0102,2.2876809 2.574374,6e-7 0.0094,-2.2876809 2.108793,-0.00923 0.04553,-2.4937637 -2.155925,0.016969 -0.0077,-1.9788186 z" /><path id="path9" style="fill-opacity:1;stroke-width:2.54;stroke-linejoin:round;paint-order:markers stroke fill" d="M 7.7674844,7.7088317 C 7.0302567,7.6972527 6.2174616,7.8657069 5.586739,8.2953592 4.7457754,8.8682287 4.0952216,10.077851 3.9196573,10.998554 c -0.1755644,0.920703 -0.00403,1.537236 0.4278808,2.410188 0.4319097,0.872953 1.757296,1.797864 2.298051,2.500623 0.5407549,0.702761 1.0361124,1.621606 1.0361124,1.621606 H 17.718299 c 0,0 0.495357,-0.918845 1.036112,-1.621606 0.540756,-0.702759 1.866142,-1.62767 2.298051,-2.500623 0.43191,-0.872952 0.603446,-1.489485 0.427881,-2.410188 C 21.304779,10.077851 20.654225,8.8682287 19.813261,8.2953592 18.972298,7.7224894 17.807689,7.613809 16.930233,7.7775613 c -0.877457,0.1637523 -1.454545,0.6053054 -2.072742,1.2614214 -0.618196,0.656117 -1.13779,1.7919363 -1.396297,2.6354983 -0.258506,0.843563 -0.204257,1.658465 -0.248047,2.297535 -0.04379,0.639069 -0.04496,1.531689 -0.04496,1.531689 h -0.01292 -0.910539 -0.01292 c 0,0 -0.0012,-0.89262 -0.04496,-1.531689 -0.04379,-0.63907 0.01046,-1.453972 -0.248046,-2.297535 C 11.680301,10.830919 11.160706,9.6950997 10.542509,9.0389827 9.9243125,8.3828667 9.3472233,7.9413136 8.4697671,7.7775613 8.2504031,7.7366232 8.013227,7.7126913 7.7674844,7.7088317 Z" /><path id="rect9" style="fill-opacity:1;stroke-width:2.54;stroke-linejoin:round;paint-order:markers stroke fill" d="m 8.0945964,18.37123 c -1.300231,0.02223 -2.2024496,0.996867 -2.2024496,1.963705 v 1.964221 h 4.0571167 5.2580765 4.057634 v -1.964221 c 0,-0.966838 -0.902736,-1.941479 -2.202966,-1.963705 H 15.20734 9.9492635 Z" /></g></svg> 
@@ -189,6 +195,46 @@ const promotionModal = document.getElementById('promotion-modal');
 const uciMoveNotation = /^([a-h]\d)([a-h]\d)([rbnq]?)$/;
 let data = undefined;
 let joinAttempts = 0;
+let gameUnavailable = false;
+function postJson(url, requestBody) {
+  return fetch(url, {
+    method: "POST",
+    body: JSON.stringify(requestBody)
+  }).then(response => response.json().catch(() => ({})).then(jsonData => {
+    if (!response.ok) {
+      const error = new Error((jsonData && jsonData.message) || `Request failed with status ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+    return jsonData;
+  }));
+}
+function handleGameApiError(err, gameId) {
+  gameUnavailable = true;
+  if (err && err.status === 404 && gameId) {
+    const listString = localStorage.getItem('chess-with-humans-games-list');
+    if (listString) {
+      const list = JSON.parse(listString).filter(g => g.game_id !== gameId);
+      localStorage.setItem('chess-with-humans-games-list', JSON.stringify(list));
+    }
+  }
+  document.getElementById('error-modal-message').innerText =
+    (err && err.status === 404)
+      ? 'This game could not be found. It may have expired.'
+      : ((err && err.message) || 'Something went wrong loading this game.');
+  document.getElementById('error-modal').style.display = 'flex';
+}
+function updateStoredExpiration(gameId, expiration) {
+  if (!gameId || expiration === undefined) return;
+  const listString = localStorage.getItem('chess-with-humans-games-list');
+  if (!listString) return;
+  const list = JSON.parse(listString);
+  const entry = list.find(g => g.game_id === gameId);
+  if (entry) {
+    entry.expiration = expiration;
+    localStorage.setItem('chess-with-humans-games-list', JSON.stringify(list));
+  }
+}
 function loadPage() {
   const gameText = document.getElementById("game-text");
   const parts = window.location.pathname.split('/');
@@ -201,27 +247,22 @@ function loadPage() {
       const currentGame = currentGamesList.find(x=>x.game_id==gameText.innerText);
       if (currentGame) {
         attemptToJoin = false;
-        fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/get', {
-          method: "POST",
-          body: JSON.stringify({
-            "game_id": currentGame.game_id,
-            "password": currentGame.password
-          })
-        }).then(x=>x.json()).then(jsonData=>{
+        postJson('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/get', {
+          "game_id": currentGame.game_id,
+          "password": currentGame.password
+        }).then(jsonData=>{
           data = jsonData;
+          updateStoredExpiration(data.game_id, data.expiration);
           buildChessBoard();
           drawChessBoard();
-        })
+        }).catch(err => handleGameApiError(err, currentGame.game_id))
       }
     }
     if (attemptToJoin && joinAttempts < 2) {
-      fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/join', {
-        method: "POST",
-        body: JSON.stringify({
-          "game_id": gameText.innerText,
-          "player_two_username": localStorage.getItem('chess-with-humans-username'),
-        })
-      }).then(x=>x.json()).then(jsonData=>{
+      postJson('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/join', {
+        "game_id": gameText.innerText,
+        "player_two_username": localStorage.getItem('chess-with-humans-username'),
+      }).then(jsonData=>{
         data = jsonData;
         currentGamesList = [];
         const currentGamesListString = localStorage.getItem('chess-with-humans-games-list');
@@ -230,11 +271,12 @@ function loadPage() {
         }
         currentGamesList.push({
           game_id: data.game_id,
-          password: data.player_two_password
+          password: data.player_two_password,
+          expiration: data.expiration
         });
         localStorage.setItem('chess-with-humans-games-list', JSON.stringify(currentGamesList));
         loadPage();
-      });
+      }).catch(err => handleGameApiError(err, gameText.innerText));
       joinAttempts = joinAttempts + 1;
     }
   }
@@ -349,6 +391,7 @@ function drawChessBoard() {
   }
 }
 function touchSquare(event) {
+  if (gameUnavailable) return;
   let action = 'select-square'
   if (data.whose_turn != data.player_id) {
     action = 'clear'
@@ -393,6 +436,7 @@ function touchSquare(event) {
   }
 }
 function performMove(move) {
+  if (gameUnavailable) return;
   Array.from(document.querySelectorAll('.potential')).forEach(x=>x.classList.remove('potential'));
   Array.from(document.querySelectorAll('.active')).forEach(x=>x.classList.remove('active'));
   if (!(typeof move == 'string') && move.target) {
@@ -402,17 +446,15 @@ function performMove(move) {
   if (currentGamesListString) {
     const currentGamesList = JSON.parse(currentGamesListString)
     const currentGame = currentGamesList.find(x=>x.game_id==data.game_id);
-    fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/move', {
-      method: "POST",
-      body: JSON.stringify({
-        "game_id": currentGame.game_id,
-        "password": currentGame.password,
-        "move": move,
-      })
-    }).then(x=>x.json()).then(jsonData=>{
+    postJson('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/move', {
+      "game_id": currentGame.game_id,
+      "password": currentGame.password,
+      "move": move,
+    }).then(jsonData=>{
       data = jsonData;
+      updateStoredExpiration(data.game_id, data.expiration);
       drawChessBoard();
-    })
+    }).catch(err => handleGameApiError(err, currentGame.game_id))
   }
 }
 let socket = undefined;
@@ -448,17 +490,15 @@ function startConnection(event) {
       if (currentGamesListString) {
         const currentGamesList = JSON.parse(currentGamesListString)
         const currentGame = currentGamesList.find(x=>x.game_id==data.game_id);
-        fetch('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/get', {
-          method: "POST",
-          body: JSON.stringify({
-            "game_id": currentGame.game_id,
-            "password": currentGame.password
-          })
-        }).then(x=>x.json()).then(jsonData=>{
+        postJson('https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev/get', {
+          "game_id": currentGame.game_id,
+          "password": currentGame.password
+        }).then(jsonData=>{
           data = jsonData;
+          updateStoredExpiration(data.game_id, data.expiration);
           drawChessBoard();
-          socket.close();
-        });
+        }).catch(err => handleGameApiError(err, currentGame.game_id))
+          .finally(() => socket.close());
       }
     }
   });
@@ -474,7 +514,7 @@ function startConnection(event) {
   });
 }
 function maintainWebSocket(event) {
-  if (data && data.game_id && (!socket || socket.readyState != WebSocket.OPEN) && checkIsPageActive() && data.whose_turn != data.player_id) {
+  if (!gameUnavailable && data && data.game_id && (!socket || socket.readyState != WebSocket.OPEN) && checkIsPageActive() && data.whose_turn != data.player_id) {
     startConnection(event);
   }
 }

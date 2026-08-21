@@ -170,6 +170,7 @@ def create_game_route(event):
     game = chess.pgn.Game()
     exporter = chess.pgn.StringExporter(headers=False, variations=True, comments=False)
     pgn_string = game.accept(exporter)
+    expiration = int(time.time()) + (7 * 24 * 60 * 60)
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
@@ -180,7 +181,7 @@ def create_game_route(event):
                 "player_one_username": player_one_username,
                 "player_one_password": player_one_password,
                 "pgn_string": pgn_string,
-                "expiration": int(time.time()) + (7 * 24 * 60 * 60),
+                "expiration": expiration,
                 "whose_turn": int(1),
             }
         ),
@@ -203,6 +204,7 @@ def create_game_route(event):
             "game_id": game_id,
             "player_one_username": player_one_username,
             "player_one_password": player_one_password,
+            "expiration": expiration,
         },
     )
 
@@ -246,6 +248,7 @@ def join_game_route(event):
     player_two_password = letter_ids.generate_id()
     game_data["player_two_username"] = player_two_username
     game_data["player_two_password"] = player_two_password
+    game_data["expiration"] = int(time.time()) + (7 * 24 * 60 * 60)
     # Write it to the database
     write_response = dynamo.put_item(
         TableName=TABLE_NAME,
@@ -269,6 +272,7 @@ def join_game_route(event):
             "game_id": game_id,
             "player_two_username": player_two_username,
             "player_two_password": player_two_password,
+            "expiration": int(game_data["expiration"]),
         },
     )
 

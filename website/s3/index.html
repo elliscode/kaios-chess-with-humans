@@ -307,7 +307,13 @@ function getLocalGamesList() {
     gamesList = JSON.parse(gamesListString);
     validGamesList = [];
     for (let game of gamesList) {
-      if (game.expiration && game.expiration < unixTimeInSeconds) {
+      if (!game.expiration) {
+        // Legacy entry from before expiration tracking existed. We don't know
+        // its real backend TTL, but it can't outlive (now + 7 days) since
+        // that's the max TTL the backend ever sets, so use that as a bound.
+        game.expiration = unixTimeInSeconds + (7 * 24 * 60 * 60);
+      }
+      if (game.expiration < unixTimeInSeconds) {
         continue;
       }
       let element = document.createElement('div');
@@ -359,7 +365,8 @@ function startGame(event) {
     data = jsonData;
     currentGamesList.push({
       game_id: data.game_id,
-      password: data.player_one_password
+      password: data.player_one_password,
+      expiration: data.expiration
     });
     localStorage.setItem('chess-with-humans-games-list', JSON.stringify(currentGamesList));
     getLocalGamesList();
