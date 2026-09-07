@@ -391,6 +391,7 @@ button:active {
 const API_BASE = 'https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev';
 const ELO_KEY_STORAGE = 'chess-with-humans-elo-key';
 const LOCAL_GAMES_LIST_KEY = 'chess-with-humans-games-list';
+const SHOW_WELCOME_MODAL = false;
 const currentGamesList = document.getElementById('current-games-list');
 const usernameInput = document.getElementById('username');
 function getCurrentUsername() {
@@ -435,7 +436,9 @@ function ensureProfile() {
     username: getCurrentUsername(),
   }).then(profile => {
     localStorage.setItem(ELO_KEY_STORAGE, profile.elo_key);
-    showWelcomeModal(profile.elo_key);
+    if (SHOW_WELCOME_MODAL) {
+      showWelcomeModal(profile.elo_key);
+    }
   });
 }
 function migrateLocalGamesListIfPresent() {

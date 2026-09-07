@@ -338,6 +338,7 @@ function handleGameApiError(err, gameId) {
 }
 const API_BASE = 'https://bau0ghibt2.execute-api.us-east-1.amazonaws.com/dev';
 const ELO_KEY_STORAGE = 'chess-with-humans-elo-key';
+const SHOW_WELCOME_MODAL = false;
 function getCurrentUsername() {
   let output = localStorage.getItem('chess-with-humans-username');
   if (!output || output.length > 16) {
@@ -357,7 +358,9 @@ function ensureProfile() {
     username: getCurrentUsername(),
   }).then(profile => {
     localStorage.setItem(ELO_KEY_STORAGE, profile.elo_key);
-    showWelcomeModal(profile.elo_key);
+    if (SHOW_WELCOME_MODAL) {
+      showWelcomeModal(profile.elo_key);
+    }
   });
 }
 function showWelcomeModal(eloKey) {
